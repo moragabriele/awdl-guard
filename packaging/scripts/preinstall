@@ -1,0 +1,13 @@
+#!/bin/sh
+# Stop running components so files can be replaced during an upgrade.
+DAEMON=io.github.moragabriele.awdlguard.daemon
+AGENT=io.github.moragabriele.awdlguard.agent
+
+launchctl bootout "system/$DAEMON" 2>/dev/null || true
+
+for uid in $(ps -axo uid=,comm= | awk '/AWDLGuardAgent$/ {print $1}' | sort -u); do
+    launchctl bootout "gui/$uid/$AGENT" 2>/dev/null || true
+done
+pkill -x AWDLGuardAgent 2>/dev/null || true
+
+exit 0

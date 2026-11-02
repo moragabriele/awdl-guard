@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  AWDL Guard - single profile for any MDM (Mosyle, Jamf, Kandji, Intune...).
+
+  Payload 1: settings. Every key is optional; omitted keys use the defaults in README.md.
+  Payload 2: Managed Login Items (macOS 13+). Pre-approves the daemon and agent so users
+             get no "Background Items Added" notification and cannot switch them off.
+             Replace REPLACE_WITH_TEAM_ID with the Team ID of your Developer ID certificate.
+
+  For different settings per device group, duplicate this file, change the values and give
+  each copy its own PayloadIdentifier and PayloadUUIDs (`uuidgen`). Scope one copy per Mac.
+-->
+<plist version="1.0">
+<dict>
+	<key>PayloadContent</key>
+	<array>
+		<dict>
+			<key>PayloadType</key>
+			<string>io.github.moragabriele.awdlguard</string>
+			<key>PayloadIdentifier</key>
+			<string>io.github.moragabriele.awdlguard.profile.settings</string>
+			<key>PayloadUUID</key>
+			<string>A8D4D216-359E-4189-88C6-5AEF16562268</string>
+			<key>PayloadVersion</key>
+			<integer>1</integer>
+			<key>PayloadDisplayName</key>
+			<string>AWDL Guard settings</string>
+
+			<key>Mode</key>
+			<string>auto</string>
+			<key>TriggerOnMicrophone</key>
+			<true/>
+			<key>TriggerOnGames</key>
+			<true/>
+			<key>TriggerApps</key>
+			<array/>
+			<key>TriggerAppsMatch</key>
+			<string>running</string>
+			<!-- While any of these apps is running, AWDL stays available (modes auto and off). -->
+			<key>ExemptApps</key>
+			<array/>
+			<!-- Let users add their own exempt apps from the menu bar. -->
+			<key>AllowUserExemptions</key>
+			<false/>
+			<key>OnlyOnWiFi</key>
+			<true/>
+			<key>ReenableDelaySeconds</key>
+			<integer>30</integer>
+			<key>AllowUserOverride</key>
+			<true/>
+			<key>OverrideMaxMinutes</key>
+			<integer>15</integer>
+			<key>ShowMenuBarIcon</key>
+			<true/>
+			<key>AllowUserQuit</key>
+			<false/>
+		</dict>
+		<dict>
+			<key>PayloadType</key>
+			<string>com.apple.servicemanagement</string>
+			<key>PayloadIdentifier</key>
+			<string>io.github.moragabriele.awdlguard.profile.loginitems</string>
+			<key>PayloadUUID</key>
+			<string>26C56A77-DBC5-4C54-8E7E-C3149DA2516C</string>
+			<key>PayloadVersion</key>
+			<integer>1</integer>
+			<key>PayloadDisplayName</key>
+			<string>AWDL Guard background items</string>
+			<key>Rules</key>
+			<array>
+				<dict>
+					<key>RuleType</key>
+					<string>TeamIdentifier</string>
+					<key>RuleValue</key>
+					<string>REPLACE_WITH_TEAM_ID</string>
+					<key>Comment</key>
+					<string>AWDL Guard (signed binaries)</string>
+				</dict>
+				<dict>
+					<key>RuleType</key>
+					<string>LabelPrefix</string>
+					<key>RuleValue</key>
+					<string>io.github.moragabriele.awdlguard</string>
+					<key>Comment</key>
+					<string>AWDL Guard launchd jobs</string>
+				</dict>
+			</array>
+		</dict>
+	</array>
+	<key>PayloadDisplayName</key>
+	<string>AWDL Guard</string>
+	<key>PayloadDescription</key>
+	<string>Controls when AWDL (AirDrop, AirPlay peer-to-peer, Sidecar) is held down to reduce Wi-Fi latency, and allows its background service.</string>
+	<key>PayloadIdentifier</key>
+	<string>io.github.moragabriele.awdlguard.profile</string>
+	<key>PayloadOrganization</key>
+	<string>Your Organization</string>
+	<key>PayloadScope</key>
+	<string>System</string>
+	<key>PayloadType</key>
+	<string>Configuration</string>
+	<key>PayloadUUID</key>
+	<string>5D33EB3D-3761-4C0B-AEC0-61D01A1CBEE1</string>
+	<key>PayloadVersion</key>
+	<integer>1</integer>
+</dict>
+</plist>

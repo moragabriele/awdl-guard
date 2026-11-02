@@ -1,0 +1,25 @@
+#!/bin/sh
+DAEMON=io.github.moragabriele.awdlguard.daemon
+AGENT=io.github.moragabriele.awdlguard.agent
+TARGET="${3:-/}"
+
+# Only start services when installing on the running system.
+[ "$TARGET" = "/" ] || exit 0
+
+chown root:wheel "/Library/LaunchDaemons/$DAEMON.plist" "/Library/LaunchAgents/$AGENT.plist" \
+    "/Library/PrivilegedHelperTools/$DAEMON"
+chmod 644 "/Library/LaunchDaemons/$DAEMON.plist" "/Library/LaunchAgents/$AGENT.plist"
+chmod 755 "/Library/PrivilegedHelperTools/$DAEMON"
+
+launchctl bootstrap system "/Library/LaunchDaemons/$DAEMON.plist" 2>/dev/null \
+    || launchctl kickstart -k "system/$DAEMON"
+
+# Start the menu bar agent for the user at the console, if any; others get it at next login.
+CONSOLE_USER=$(stat -f %Su /dev/console)
+if [ -n "$CONSOLE_USER" ] && [ "$CONSOLE_USER" != "root" ] && [ "$CONSOLE_USER" != "loginwindow" ]; then
+    uid=$(id -u "$CONSOLE_USER")
+    launchctl bootstrap "gui/$uid" "/Library/LaunchAgents/$AGENT.plist" 2>/dev/null \
+        || launchctl kickstart -k "gui/$uid/$AGENT" 2>/dev/null || true
+fi
+
+exit 0

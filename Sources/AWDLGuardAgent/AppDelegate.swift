@@ -1,0 +1,262 @@
+import AppKit
+import AWDLShared
+import os
+import UniformTypeIdentifiers
+
+private let log = Logger(subsystem: Constants.logSubsystem, category: "agent")
+
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+    private let client = DaemonClient()
+    private let activity = ActivityWatcher()
+    private var settings = Settings.load()
+    private var status: DaemonStatus?
+    private var statusItem: NSStatusItem?
+    private var lastSentReport: ActivityReport?
+    private var timer: Timer?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        client.onDisconnect = { [weak self] in
+            // The daemon lost our last report (restart, upgrade): resend it shortly.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                self?.lastSentReport = nil
+                self?.sendReport()
+            }
+        }
+        activity.onChange = { [weak self] in self?.sendReport() }
+        activity.start()
+        timer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in self?.tick() }
+        tick()
+    }
+
+    private func tick() {
+        settings = Settings.load()
+        updateStatusItemVisibility()
+        lastSentReport = nil // periodic heartbeat
+        sendReport()
+    }
+
+    // MARK: - Daemon
+
+    private func sendReport() {
+        let report = activity.current()
+        guard report != lastSentReport, let data = try? JSON.encoder.encode(report) else {
+            return refreshStatus()
+        }
+        lastSentReport = report
+        client.proxy { error in log.error("report failed: \(error.localizedDescription, privacy: .public)") }?
+            .report(activity: data) { [weak self] _ in
+                DispatchQueue.main.async { self?.refreshStatus() }
+            }
+    }
+
+    private func refreshStatus() {
+        let proxy = client.proxy { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.status = nil
+                self?.updateIcon()
+            }
+        }
+        proxy?.getStatus { [weak self] data in
+            let s = data.flatMap { try? JSON.decoder.decode(DaemonStatus.self, from: $0) }
+            DispatchQueue.main.async {
+                self?.status = s
+                self?.updateIcon()
+            }
+        }
+    }
+
+    // MARK: - Menu bar
+
+    private func updateStatusItemVisibility() {
+        if settings.showMenuBarIcon, statusItem == nil {
+            let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+            let menu = NSMenu()
+            menu.delegate = self
+            item.menu = menu
+            statusItem = item
+            updateIcon()
+        } else if !settings.showMenuBarIcon, let item = statusItem {
+            NSStatusBar.system.removeStatusItem(item)
+            statusItem = nil
+        }
+    }
+
+    private func updateIcon() {
+        guard let button = statusItem?.button else { return }
+        let symbol: String
+        let description: String
+        switch status?.awdlAllowed {
+        case .some(true):
+            symbol = "antenna.radiowaves.left.and.right"
+            description = "AWDL allowed"
+        case .some(false):
+            symbol = "antenna.radiowaves.left.and.right.slash"
+            description = "AWDL held down"
+        case .none:
+            symbol = "exclamationmark.triangle"
+            description = "AWDL Guard daemon not reachable"
+        }
+        button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: description)
+        button.image?.isTemplate = true
+        button.toolTip = description
+    }
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+        refreshStatus()
+
+        guard let s = status else {
+            menu.addItem(disabled("Daemon not running"))
+            addFooter(to: menu)
+            return
+        }
+
+        menu.addItem(disabled(s.awdlAllowed ? "AWDL: allowed" : "AWDL: held down"))
+        menu.addItem(disabled("Reason: \(s.reason)"))
+        if !s.activeTriggers.isEmpty {
+            menu.addItem(disabled("Triggers: \(s.activeTriggers.map(Self.describe).joined(separator: ", "))"))
+        }
+        if !s.activeExemptions.isEmpty {
+            menu.addItem(disabled("Excluded: \(s.activeExemptions.map(Self.appName).joined(separator: ", "))"))
+        }
+        menu.addItem(disabled("Mode: \(s.mode.rawValue)"))
+        menu.addItem(.separator())
+
+        if let until = s.overrideUntil {
+            let time = DateFormatter.localizedString(from: until, dateStyle: .none, timeStyle: .short)
+            menu.addItem(action("End temporary allow (until \(time))", #selector(cancelOverride)))
+        } else if s.overrideAvailable && !s.awdlAllowed {
+            menu.addItem(action("Allow AirDrop/AirPlay for \(s.overrideMaxMinutes) min", #selector(requestOverride)))
+        }
+
+        if s.userExemptionsAllowed || !s.exemptApps.isEmpty {
+            let item = NSMenuItem(title: "Exclusions", action: nil, keyEquivalent: "")
+            item.submenu = exclusionsMenu(status: s)
+            menu.addItem(item)
+        }
+
+        if !s.managedKeys.isEmpty {
+            menu.addItem(.separator())
+            menu.addItem(disabled("Settings managed by your organization"))
+        }
+        addFooter(to: menu)
+    }
+
+    private func addFooter(to menu: NSMenu) {
+        guard settings.allowUserQuit else { return }
+        menu.addItem(.separator())
+        menu.addItem(action("Quit AWDL Guard", #selector(quit)))
+    }
+
+    // MARK: - Exclusions
+
+    /// Apps listed here keep AWDL available while they are running.
+    private func exclusionsMenu(status s: DaemonStatus) -> NSMenu {
+        let menu = NSMenu()
+        for id in s.exemptApps {
+            menu.addItem(disabled("\(Self.appName(id)) (managed)"))
+        }
+
+        guard s.userExemptionsAllowed else {
+            return menu
+        }
+        let mine = Settings.loadUserExemptApps()
+        for id in mine {
+            let item = action(Self.appName(id), #selector(removeExemption(_:)))
+            item.state = .on
+            item.representedObject = id
+            item.toolTip = "Click to remove"
+            menu.addItem(item)
+        }
+        if !menu.items.isEmpty {
+            menu.addItem(.separator())
+        }
+
+        // A status menu does not activate us, so this is still the app the user was working in.
+        if let front = NSWorkspace.shared.frontmostApplication, let id = front.bundleIdentifier,
+           id != Bundle.main.bundleIdentifier,
+           !mine.contains(where: { $0.caseInsensitiveCompare(id) == .orderedSame }) {
+            let item = action("Add \(front.localizedName ?? id)", #selector(addExemption(_:)))
+            item.representedObject = id
+            menu.addItem(item)
+        }
+        menu.addItem(action("Choose App…", #selector(chooseExemption)))
+        return menu
+    }
+
+    @objc private func addExemption(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        updateUserExemptions { $0.append(id) }
+    }
+
+    @objc private func removeExemption(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        updateUserExemptions { $0.removeAll { $0 == id } }
+    }
+
+    @objc private func chooseExemption() {
+        let panel = NSOpenPanel()
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        panel.allowedContentTypes = [.application]
+        panel.allowsMultipleSelection = true
+        panel.message = "Choose apps that keep AirDrop, AirPlay and Sidecar available while open"
+        panel.prompt = "Exclude"
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK else { return }
+        let ids = panel.urls.compactMap { Bundle(url: $0)?.bundleIdentifier }
+        updateUserExemptions { $0.append(contentsOf: ids) }
+    }
+
+    private func updateUserExemptions(_ change: (inout [String]) -> Void) {
+        var apps = Settings.loadUserExemptApps()
+        change(&apps)
+        var seen = Set<String>()
+        apps = apps.filter { seen.insert($0.lowercased()).inserted }
+        Settings.saveUserExemptApps(apps)
+        lastSentReport = nil
+        sendReport()
+    }
+
+    private static func appName(_ bundleID: String) -> String {
+        let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
+        return url.map { FileManager.default.displayName(atPath: $0.path) } ?? bundleID
+    }
+
+    private static func describe(_ trigger: String) -> String {
+        if trigger == "microphone" { return "call / microphone" }
+        if let id = trigger.split(separator: ":", maxSplits: 1).last, trigger.contains(":") {
+            return appName(String(id))
+        }
+        return trigger
+    }
+
+    private func disabled(_ title: String) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        item.isEnabled = false
+        return item
+    }
+
+    private func action(_ title: String, _ selector: Selector) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: selector, keyEquivalent: "")
+        item.target = self
+        return item
+    }
+
+    @objc private func requestOverride() {
+        let minutes = status?.overrideMaxMinutes ?? 15
+        client.proxy { _ in }?.requestOverride(minutes: minutes) { [weak self] ok, message in
+            if !ok { log.error("override refused: \(message, privacy: .public)") }
+            DispatchQueue.main.async { self?.refreshStatus() }
+        }
+    }
+
+    @objc private func cancelOverride() {
+        client.proxy { _ in }?.cancelOverride { [weak self] _ in
+            DispatchQueue.main.async { self?.refreshStatus() }
+        }
+    }
+
+    @objc private func quit() {
+        NSApp.terminate(nil)
+    }
+}

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>io.github.moragabriele.awdlguard.agent</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Applications/AWDL Guard.app/Contents/MacOS/AWDLGuardAgent</string>
+	</array>
+	<key>LimitLoadToSessionType</key>
+	<string>Aqua</string>
+	<key>RunAtLoad</key>
+	<true/>
+	<!-- Restart after a crash, but respect an intentional Quit (AllowUserQuit). -->
+	<key>KeepAlive</key>
+	<dict>
+		<key>SuccessfulExit</key>
+		<false/>
+	</dict>
+	<key>ProcessType</key>
+	<string>Interactive</string>
+	<key>AssociatedBundleIdentifiers</key>
+	<array>
+		<string>io.github.moragabriele.awdlguard.agent</string>
+	</array>
+</dict>
+</plist>
