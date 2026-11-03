@@ -6,6 +6,8 @@ usage: awdl-guardctl <command>
 
 commands:
   status [--json]        show daemon state (use --json for MDM inventory scripts)
+  mode <auto|block|allow|default>
+                         choose the mode if policy permits; "default" goes back to the policy's
   allow [minutes]        temporarily allow AWDL (AirDrop, AirPlay, Sidecar...) if policy permits
   cancel                 end a temporary allow
   reload                 re-read preferences now
@@ -23,7 +25,8 @@ func printStatus(_ s: DaemonStatus) {
     df.timeStyle = .short
     print("AWDL:          \(s.awdlAllowed ? "allowed" : "held down") (\(s.reason))")
     print("awdl0:         \(s.interfaceState)")
-    print("Mode:          \(s.mode.rawValue)")
+    let source = s.userMode != nil && s.mode == s.userMode ? "chosen by user" : "policy"
+    print("Mode:          \(s.mode.rawValue) (\(source)\(s.modeChangeAllowed ? "" : ", locked"))")
     print("Wi-Fi in use:  \(s.onWiFi ? "yes" : "no")")
     print("Triggers:      \(s.activeTriggers.isEmpty ? "none" : s.activeTriggers.joined(separator: ", "))")
     print("Exemptions:    \(s.activeExemptions.isEmpty ? "none" : s.activeExemptions.joined(separator: ", "))")
@@ -64,6 +67,18 @@ case "allow":
     guard minutes > 0 else { fail("minutes must be a positive integer") }
     let result: Result<(Bool, String), DaemonClientError> = client.sync { p, done in
         p.requestOverride(minutes: minutes) { ok, msg in done((ok, msg)) }
+    }
+    switch result {
+    case .failure(let error): fail(error.description)
+    case .success(let (ok, msg)):
+        guard ok else { fail(msg) }
+        print(msg)
+    }
+
+case "mode":
+    guard args.count > 1 else { fail("usage: awdl-guardctl mode <auto|block|allow|default>") }
+    let result: Result<(Bool, String), DaemonClientError> = client.sync { p, done in
+        p.setMode(args[1]) { ok, msg in done((ok, msg)) }
     }
     switch result {
     case .failure(let error): fail(error.description)

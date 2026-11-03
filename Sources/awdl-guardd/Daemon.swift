@@ -16,6 +16,8 @@ final class Daemon: NSObject, NSXPCListenerDelegate {
 
     private var settings = Settings()
     private var managedKeys: [String] = []
+    /// Mode picked from the menu bar or awdl-guardctl; persisted in `Constants.stateFile`.
+    private var userMode: Mode?
     private var reports: [ObjectIdentifier: ActivityReport] = [:]
     private var overrideUntil: Date?
     private var lastTriggerSeen: Date?
@@ -35,6 +37,7 @@ final class Daemon: NSObject, NSXPCListenerDelegate {
 
     func start() {
         queue.sync {
+            loadState()
             reloadSettings()
             network.onChange = { [weak self] onWiFi in
                 log.info("Wi-Fi in use: \(onWiFi, privacy: .public)")
@@ -76,6 +79,37 @@ final class Daemon: NSObject, NSXPCListenerDelegate {
         }
     }
 
+    /// Settings with the mode actually in force (the user's choice when allowed).
+    private var effective: Settings {
+        var s = settings
+        s.mode = Policy.effectiveMode(settings: settings, managedKeys: managedKeys, userMode: userMode)
+        return s
+    }
+
+    private func loadState() {
+        guard let data = FileManager.default.contents(atPath: Constants.stateFile),
+              let dict = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+              let raw = dict["UserMode"] as? String else { return }
+        userMode = Mode(parsing: raw)
+    }
+
+    private func saveState() {
+        let url = URL(fileURLWithPath: Constants.stateFile)
+        do {
+            if let userMode {
+                try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
+                                                        withIntermediateDirectories: true)
+                let data = try PropertyListSerialization.data(
+                    fromPropertyList: ["UserMode": userMode.rawValue], format: .xml, options: 0)
+                try data.write(to: url, options: .atomic)
+            } else if FileManager.default.fileExists(atPath: url.path) {
+                try FileManager.default.removeItem(at: url)
+            }
+        } catch {
+            log.error("Could not save state: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
     private func evaluate() {
         dispatchPrecondition(condition: .onQueue(queue))
         let now = Date()
@@ -84,15 +118,16 @@ final class Daemon: NSObject, NSXPCListenerDelegate {
             log.info("User override expired")
         }
 
-        let triggers = settings.mode == .auto
-            ? Policy.activeTriggers(settings: settings, reports: Array(reports.values))
+        let current = effective
+        let triggers = current.mode == .auto
+            ? Policy.activeTriggers(settings: current, reports: Array(reports.values))
             : []
         if !triggers.isEmpty {
             lastTriggerSeen = now
         }
 
         let new = Policy.decide(PolicyInput(
-            settings: settings, now: now, overrideUntil: overrideUntil, onWiFi: network.onWiFi,
+            settings: current, now: now, overrideUntil: overrideUntil, onWiFi: network.onWiFi,
             reports: Array(reports.values), lastTriggerSeen: lastTriggerSeen
         ))
         if new.allowAWDL != appliedAllow {
@@ -112,13 +147,16 @@ final class Daemon: NSObject, NSXPCListenerDelegate {
         case .down: iface = "down"
         default: iface = "missing"
         }
+        let current = effective
         return DaemonStatus(
-            version: Constants.version, mode: settings.mode, awdlAllowed: decision.allowAWDL,
+            version: Constants.version, mode: current.mode, policyMode: settings.mode, userMode: userMode,
+            modeChangeAllowed: Policy.userModeAllowed(settings: settings, managedKeys: managedKeys),
+            awdlAllowed: decision.allowAWDL,
             interfaceState: iface, reason: decision.reason, activeTriggers: decision.activeTriggers,
             activeExemptions: decision.activeExemptions, exemptApps: settings.exemptApps,
             userExemptionsAllowed: settings.allowUserExemptions,
             onWiFi: network.onWiFi, overrideUntil: overrideUntil,
-            overrideAvailable: settings.allowUserOverride && settings.mode != .on,
+            overrideAvailable: settings.allowUserOverride && current.mode != .allow,
             overrideMaxMinutes: settings.overrideMaxMinutes, managedKeys: managedKeys,
             connectedAgents: reports.count
         )
@@ -151,7 +189,7 @@ final class Daemon: NSObject, NSXPCListenerDelegate {
             guard self.settings.allowUserOverride else {
                 return reply(false, "Temporary override is disabled by policy")
             }
-            guard self.settings.mode != .on else {
+            guard self.effective.mode != .allow else {
                 return reply(false, "AWDL is already allowed")
             }
             let m = min(max(minutes, 1), self.settings.overrideMaxMinutes)
@@ -168,6 +206,25 @@ final class Daemon: NSObject, NSXPCListenerDelegate {
             self.overrideUntil = nil
             self.evaluate()
             reply(had)
+        }
+    }
+
+    func handleSetMode(_ raw: String, reply: @escaping (Bool, String) -> Void) {
+        queue.async {
+            guard Policy.userModeAllowed(settings: self.settings, managedKeys: self.managedKeys) else {
+                return reply(false, "Changing the mode is disabled by policy")
+            }
+            if raw.lowercased() == "default" {
+                self.userMode = nil
+            } else if let mode = Mode(parsing: raw) {
+                self.userMode = mode
+            } else {
+                return reply(false, "Unknown mode '\(raw)': use auto, block, allow or default")
+            }
+            self.saveState()
+            log.notice("User mode set to \(self.userMode?.rawValue ?? "default", privacy: .public)")
+            self.evaluate()
+            reply(true, "Mode is now \(self.effective.mode.rawValue)")
         }
     }
 
@@ -267,5 +324,11 @@ final class ClientSession: NSObject, AWDLGuardXPC {
     func reload(withReply reply: @escaping (Bool) -> Void) {
         guard let daemon else { return reply(false) }
         daemon.handleReload(reply: reply)
+    }
+
+    func setMode(_ mode: String, withReply reply: @escaping (Bool, String) -> Void) {
+        guard let daemon else { return reply(false, "daemon unavailable") }
+        log.info("Mode change to \(mode, privacy: .public) requested by pid \(self.pid)")
+        daemon.handleSetMode(mode, reply: reply)
     }
 }

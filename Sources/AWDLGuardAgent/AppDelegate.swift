@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var settings = Settings.load()
     private var status: DaemonStatus?
     private var statusItem: NSStatusItem?
+    private var shownSymbol: String?
     private var lastSentReport: ActivityReport?
     private var timer: Timer?
 
@@ -74,6 +75,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.delegate = self
             item.menu = menu
             statusItem = item
+            shownSymbol = nil
             updateIcon()
         } else if !settings.showMenuBarIcon, let item = statusItem {
             NSStatusBar.system.removeStatusItem(item)
@@ -96,9 +98,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             symbol = "exclamationmark.triangle"
             description = "AWDL Guard daemon not reachable"
         }
+        // Status refreshes every few seconds; touching the button each time makes AppKit
+        // re-show hover UI wherever the pointer is. No tooltip: the menu already shows the state.
+        guard symbol != shownSymbol else { return }
+        shownSymbol = symbol
         button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: description)
         button.image?.isTemplate = true
-        button.toolTip = description
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
@@ -119,7 +124,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if !s.activeExemptions.isEmpty {
             menu.addItem(disabled("Excluded: \(s.activeExemptions.map(Self.appName).joined(separator: ", "))"))
         }
-        menu.addItem(disabled("Mode: \(s.mode.rawValue)"))
+        if s.modeChangeAllowed {
+            let item = NSMenuItem(title: "Mode: \(Self.modeTitle(s.mode))", action: nil, keyEquivalent: "")
+            item.submenu = modeMenu(status: s)
+            menu.addItem(item)
+        } else {
+            menu.addItem(disabled("Mode: \(Self.modeTitle(s.mode))"))
+        }
         menu.addItem(.separator())
 
         if let until = s.overrideUntil {
@@ -146,6 +157,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard settings.allowUserQuit else { return }
         menu.addItem(.separator())
         menu.addItem(action("Quit AWDL Guard", #selector(quit)))
+    }
+
+    // MARK: - Mode
+
+    private static func modeTitle(_ mode: Mode) -> String {
+        switch mode {
+        case .auto: return "Auto (calls, games)"
+        case .block: return "Always block AWDL"
+        case .allow: return "Always allow AWDL"
+        }
+    }
+
+    private func modeMenu(status s: DaemonStatus) -> NSMenu {
+        let menu = NSMenu()
+        for mode in Mode.allCases {
+            let item = action(Self.modeTitle(mode), #selector(selectMode(_:)))
+            item.representedObject = mode.rawValue
+            item.state = s.mode == mode ? .on : .off
+            menu.addItem(item)
+        }
+        if s.userMode != nil {
+            menu.addItem(.separator())
+            let item = action("Use default (\(Self.modeTitle(s.policyMode)))", #selector(selectMode(_:)))
+            item.representedObject = "default"
+            menu.addItem(item)
+        }
+        return menu
+    }
+
+    @objc private func selectMode(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String else { return }
+        client.proxy { _ in }?.setMode(raw) { [weak self] ok, message in
+            if !ok { log.error("mode change refused: \(message, privacy: .public)") }
+            DispatchQueue.main.async { self?.refreshStatus() }
+        }
     }
 
     // MARK: - Exclusions

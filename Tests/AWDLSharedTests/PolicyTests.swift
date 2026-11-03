@@ -12,20 +12,20 @@ private func settings(_ configure: (inout Settings) -> Void = { _ in }) -> Setti
     let now = Date(timeIntervalSince1970: 1_000_000)
 
     @Test func modeOnAlwaysAllows() {
-        let d = Policy.decide(PolicyInput(settings: settings { $0.mode = .on }, onWiFi: true,
+        let d = Policy.decide(PolicyInput(settings: settings { $0.mode = .allow }, onWiFi: true,
                                           reports: [ActivityReport(microphoneInUse: true)]))
         #expect(d.allowAWDL)
     }
 
     @Test func modeOffHoldsDownOnWiFi() {
-        let d = Policy.decide(PolicyInput(settings: settings { $0.mode = .off }, onWiFi: true))
+        let d = Policy.decide(PolicyInput(settings: settings { $0.mode = .block }, onWiFi: true))
         #expect(!d.allowAWDL)
     }
 
     @Test func onlyOnWiFiAllowsOnEthernet() {
-        let d = Policy.decide(PolicyInput(settings: settings { $0.mode = .off }, onWiFi: false))
+        let d = Policy.decide(PolicyInput(settings: settings { $0.mode = .block }, onWiFi: false))
         #expect(d.allowAWDL)
-        let d2 = Policy.decide(PolicyInput(settings: settings { $0.mode = .off; $0.onlyOnWiFi = false }, onWiFi: false))
+        let d2 = Policy.decide(PolicyInput(settings: settings { $0.mode = .block; $0.onlyOnWiFi = false }, onWiFi: false))
         #expect(!d2.allowAWDL)
     }
 
@@ -66,12 +66,12 @@ private func settings(_ configure: (inout Settings) -> Void = { _ in }) -> Setti
     }
 
     @Test func overrideAllowsUntilExpiryUnlessPolicyForbids() {
-        let off = settings { $0.mode = .off }
+        let off = settings { $0.mode = .block }
         let active = Policy.decide(PolicyInput(settings: off, now: now, overrideUntil: now.addingTimeInterval(60), onWiFi: true))
         #expect(active.allowAWDL)
         let expired = Policy.decide(PolicyInput(settings: off, now: now, overrideUntil: now.addingTimeInterval(-1), onWiFi: true))
         #expect(!expired.allowAWDL)
-        let forbidden = Policy.decide(PolicyInput(settings: settings { $0.mode = .off; $0.allowUserOverride = false },
+        let forbidden = Policy.decide(PolicyInput(settings: settings { $0.mode = .block; $0.allowUserOverride = false },
                                                   now: now, overrideUntil: now.addingTimeInterval(60), onWiFi: true))
         #expect(!forbidden.allowAWDL)
     }
@@ -82,13 +82,13 @@ private func settings(_ configure: (inout Settings) -> Void = { _ in }) -> Setti
                                              onWiFi: true, reports: [report]))
         #expect(auto.allowAWDL)
         #expect(auto.activeExemptions == ["com.example.sidecarapp"])
-        let off = Policy.decide(PolicyInput(settings: settings { $0.mode = .off; $0.exemptApps = ["com.example.sidecarapp"] },
+        let off = Policy.decide(PolicyInput(settings: settings { $0.mode = .block; $0.exemptApps = ["com.example.sidecarapp"] },
                                             onWiFi: true, reports: [report]))
         #expect(off.allowAWDL)
     }
 
     @Test func exemptionOnlyWhileAppRuns() {
-        let s = settings { $0.mode = .off; $0.exemptApps = ["com.example.sidecarapp"] }
+        let s = settings { $0.mode = .block; $0.exemptApps = ["com.example.sidecarapp"] }
         let d = Policy.decide(PolicyInput(settings: s, onWiFi: true, reports: [ActivityReport(runningBundleIDs: ["com.other"])]))
         #expect(!d.allowAWDL)
     }
@@ -126,10 +126,40 @@ private func settings(_ configure: (inout Settings) -> Void = { _ in }) -> Setti
             "OnlyOnWiFi": "not a bool",
             "TriggerAppsMatch": "bogus",
         ])
-        #expect(s.mode == .off)
+        #expect(s.mode == .block)
         #expect(s.triggerApps == ["us.zoom.xos"])
         #expect(s.overrideMaxMinutes == 1440)
         #expect(s.onlyOnWiFi == true)
         #expect(s.triggerAppsMatch == .running)
+    }
+
+    @Test func modeAcceptsNewNamesAndOldAliases() {
+        #expect(Mode(parsing: "Block") == .block)
+        #expect(Mode(parsing: "allow") == .allow)
+        #expect(Mode(parsing: "off") == .block)
+        #expect(Mode(parsing: "ON") == .allow)
+        #expect(Mode(parsing: "bogus") == nil)
+    }
+
+    @Test func userMayChangeModeUnlessProfileEnforcesIt() {
+        let s = settings { $0.mode = .auto }
+        #expect(Policy.userModeAllowed(settings: s, managedKeys: []))
+        #expect(!Policy.userModeAllowed(settings: s, managedKeys: ["Mode"]))
+        let explicitYes = settings { $0.allowUserModeChange = true }
+        #expect(Policy.userModeAllowed(settings: explicitYes, managedKeys: ["Mode"]))
+        let explicitNo = settings { $0.allowUserModeChange = false }
+        #expect(!Policy.userModeAllowed(settings: explicitNo, managedKeys: []))
+    }
+
+    @Test func effectiveModeUsesUserChoiceOnlyWhenAllowed() {
+        let s = settings { $0.mode = .auto }
+        #expect(Policy.effectiveMode(settings: s, managedKeys: [], userMode: .block) == .block)
+        #expect(Policy.effectiveMode(settings: s, managedKeys: ["Mode"], userMode: .block) == .auto)
+        #expect(Policy.effectiveMode(settings: s, managedKeys: [], userMode: nil) == .auto)
+    }
+
+    @Test func allowUserModeChangeParsing() {
+        #expect(Settings(values: [:]).allowUserModeChange == nil)
+        #expect(Settings(values: ["AllowUserModeChange": true]).allowUserModeChange == true)
     }
 }

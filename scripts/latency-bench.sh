@@ -4,7 +4,7 @@
 #   ./scripts/latency-bench.sh [seconds] [target]
 #
 # Run it once with AWDL allowed and once held down (e.g. `awdl-guardctl allow 10`
-# then `awdl-guardctl cancel` with Mode=off), ideally doing the same thing on the
+# then `awdl-guardctl cancel` with Mode=block), ideally doing the same thing on the
 # Mac each time. Each run appends a CSV row to ./latency-results.csv.
 set -euo pipefail
 

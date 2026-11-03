@@ -8,6 +8,8 @@ import Foundation
     func requestOverride(minutes: Int, withReply reply: @escaping (Bool, String) -> Void)
     func cancelOverride(withReply reply: @escaping (Bool) -> Void)
     func reload(withReply reply: @escaping (Bool) -> Void)
+    /// `mode` is a Mode raw value, or "default" to go back to the policy's mode.
+    func setMode(_ mode: String, withReply reply: @escaping (Bool, String) -> Void)
 }
 
 public enum DaemonClientError: Error, CustomStringConvertible {

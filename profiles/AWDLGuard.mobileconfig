@@ -27,8 +27,12 @@
 			<key>PayloadDisplayName</key>
 			<string>AWDL Guard settings</string>
 
+			<!-- auto: block AWDL during calls/games/listed apps. block: always. allow: never. -->
 			<key>Mode</key>
 			<string>auto</string>
+			<!-- Let users switch mode from the menu bar. Omit it to lock the mode set above. -->
+			<key>AllowUserModeChange</key>
+			<false/>
 			<key>TriggerOnMicrophone</key>
 			<true/>
 			<key>TriggerOnGames</key>
@@ -37,7 +41,7 @@
 			<array/>
 			<key>TriggerAppsMatch</key>
 			<string>running</string>
-			<!-- While any of these apps is running, AWDL stays available (modes auto and off). -->
+			<!-- While any of these apps is running, AWDL stays available (modes auto and block). -->
 			<key>ExemptApps</key>
 			<array/>
 			<!-- Let users add their own exempt apps from the menu bar. -->

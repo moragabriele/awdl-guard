@@ -11,6 +11,8 @@ public enum Constants {
     public static let agentLabel = "io.github.moragabriele.awdlguard.agent"
     public static let agentBundleID = "io.github.moragabriele.awdlguard.agent"
     public static let logSubsystem = "io.github.moragabriele.awdlguard"
+    /// Root-owned daemon state that must survive restarts (the user's chosen mode).
+    public static let stateFile = "/Library/Application Support/AWDL Guard/state.plist"
 }
 
 public enum JSON {

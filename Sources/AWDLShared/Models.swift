@@ -36,7 +36,13 @@ public struct ActivityReport: Codable, Equatable, Sendable {
 
 public struct DaemonStatus: Codable, Sendable {
     public var version: String
+    /// Mode in effect: the user's choice when allowed, otherwise the policy's.
     public var mode: Mode
+    /// Mode from the profile / preferences / defaults.
+    public var policyMode: Mode
+    /// Mode picked by a user, if any (kept even while not allowed, but then ignored).
+    public var userMode: Mode?
+    public var modeChangeAllowed: Bool
     public var awdlAllowed: Bool
     /// "up", "down" or "missing" (no Wi-Fi hardware / interface not created yet).
     public var interfaceState: String
@@ -53,12 +59,16 @@ public struct DaemonStatus: Codable, Sendable {
     public var managedKeys: [String]
     public var connectedAgents: Int
 
-    public init(version: String, mode: Mode, awdlAllowed: Bool, interfaceState: String, reason: String,
+    public init(version: String, mode: Mode, policyMode: Mode, userMode: Mode?, modeChangeAllowed: Bool,
+                awdlAllowed: Bool, interfaceState: String, reason: String,
                 activeTriggers: [String], activeExemptions: [String], exemptApps: [String],
                 userExemptionsAllowed: Bool, onWiFi: Bool, overrideUntil: Date?, overrideAvailable: Bool,
                 overrideMaxMinutes: Int, managedKeys: [String], connectedAgents: Int) {
         self.version = version
         self.mode = mode
+        self.policyMode = policyMode
+        self.userMode = userMode
+        self.modeChangeAllowed = modeChangeAllowed
         self.awdlAllowed = awdlAllowed
         self.interfaceState = interfaceState
         self.reason = reason

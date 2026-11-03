@@ -4,62 +4,87 @@
   "properties": {
     "Mode": {
       "title": "Mode",
-      "description": "on: never touch AWDL. off: always hold AWDL down. auto: hold AWDL down only while a trigger is active.",
+      "description": "auto: hold AWDL down only while a trigger is active. block: always hold AWDL down. allow: never touch AWDL (stock macOS).",
       "type": "string",
       "default": "auto",
-      "enum": ["auto", "off", "on"],
-      "options": { "enum_titles": ["Auto (calls, games, listed apps)", "Always off", "Always on (stock macOS)"] },
+      "enum": [
+        "auto",
+        "block",
+        "allow"
+      ],
+      "options": {
+        "enum_titles": [
+          "Auto (calls, games, listed apps)",
+          "Always block AWDL",
+          "Always allow AWDL (stock macOS)"
+        ]
+      },
       "property_order": 1
+    },
+    "AllowUserModeChange": {
+      "title": "Allow users to change the mode",
+      "description": "Users can switch mode from the menu bar or awdl-guardctl. If not set, users may change it unless this profile sets Mode.",
+      "type": "boolean",
+      "property_order": 2
     },
     "TriggerOnMicrophone": {
       "title": "Trigger: microphone in use",
       "description": "Hold AWDL down while any app captures audio input (Zoom, Teams, FaceTime, Google Meet in a browser).",
       "type": "boolean",
       "default": true,
-      "property_order": 2
+      "property_order": 3
     },
     "TriggerOnGames": {
       "title": "Trigger: game in foreground",
       "description": "Hold AWDL down while the frontmost app declares itself a game.",
       "type": "boolean",
       "default": true,
-      "property_order": 3
+      "property_order": 4
     },
     "TriggerApps": {
       "title": "Trigger apps",
       "description": "Bundle identifiers that hold AWDL down, e.g. us.zoom.xos, com.microsoft.teams2.",
       "type": "array",
-      "items": { "type": "string", "title": "Bundle identifier" },
-      "property_order": 4
+      "items": {
+        "type": "string",
+        "title": "Bundle identifier"
+      },
+      "property_order": 5
     },
     "TriggerAppsMatch": {
       "title": "Trigger apps match",
       "description": "running: while the app is open. frontmost: only while it is the active app.",
       "type": "string",
       "default": "running",
-      "enum": ["running", "frontmost"],
-      "property_order": 5
+      "enum": [
+        "running",
+        "frontmost"
+      ],
+      "property_order": 6
     },
     "ExemptApps": {
       "title": "Exempt apps",
       "description": "Bundle identifiers that keep AWDL available while running, in auto and off modes (e.g. apps used with Sidecar or AirPlay).",
       "type": "array",
-      "items": { "type": "string", "title": "Bundle identifier" },
-      "property_order": 6
+      "items": {
+        "type": "string",
+        "title": "Bundle identifier"
+      },
+      "property_order": 7
     },
     "AllowUserExemptions": {
       "title": "Allow users to add exempt apps",
       "description": "Users can add their own exempt apps from the menu bar.",
       "type": "boolean",
       "default": false,
-      "property_order": 7
+      "property_order": 8
     },
     "OnlyOnWiFi": {
       "title": "Only when using Wi-Fi",
       "description": "Leave AWDL alone when the Mac is on wired Ethernet.",
       "type": "boolean",
       "default": true,
-      "property_order": 8
+      "property_order": 9
     },
     "ReenableDelaySeconds": {
       "title": "Re-enable delay (seconds)",
@@ -68,14 +93,14 @@
       "default": 30,
       "minimum": 0,
       "maximum": 3600,
-      "property_order": 9
+      "property_order": 10
     },
     "AllowUserOverride": {
       "title": "Allow temporary user override",
       "description": "Let users re-enable AWDL for a limited time from the menu bar (e.g. to use AirDrop).",
       "type": "boolean",
       "default": true,
-      "property_order": 10
+      "property_order": 11
     },
     "OverrideMaxMinutes": {
       "title": "Override duration (minutes)",
@@ -84,20 +109,20 @@
       "default": 15,
       "minimum": 1,
       "maximum": 1440,
-      "property_order": 11
+      "property_order": 12
     },
     "ShowMenuBarIcon": {
       "title": "Show menu bar icon",
       "type": "boolean",
       "default": true,
-      "property_order": 12
+      "property_order": 13
     },
     "AllowUserQuit": {
       "title": "Allow users to quit the menu bar agent",
       "description": "If disabled, the Quit item is hidden. Quitting stops trigger detection for that user.",
       "type": "boolean",
       "default": true,
-      "property_order": 13
+      "property_order": 14
     }
   }
 }

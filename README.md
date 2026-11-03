@@ -21,7 +21,7 @@ installer packaging.
 |---|---|---|
 | `awdl-guardd` | root, LaunchDaemon | Reads policy, decides, holds `awdl0` down or hands it back to macOS. Always restores AWDL when stopped. |
 | `AWDL Guard.app` | each user, LaunchAgent | Reports frontmost/running apps and microphone use to the daemon; optional menu bar icon with status and temporary allow. |
-| `awdl-guardctl` | anyone | CLI: status (also `--json`), temporary allow, reload. |
+| `awdl-guardctl` | anyone | CLI: status (also `--json`), mode, temporary allow, reload. |
 
 The daemon and agent talk over XPC. Release builds only accept clients signed by the
 same Developer ID team. All policy is enforced in the daemon, so a client can never do
@@ -34,12 +34,19 @@ more than the configuration permits. Nothing is sent off the Mac.
   - **game in the foreground** (same signals macOS uses for Game Mode);
   - **listed apps** (`TriggerApps`), either while running or only when frontmost.
   When the last trigger ends, AWDL comes back after `ReenableDelaySeconds`.
-- `off`: AWDL is always held down (best latency; no AirDrop/AirPlay/Sidecar).
-- `on`: stock macOS behaviour.
+- `block`: AWDL is always held down (best latency; no AirDrop/AirPlay/Sidecar).
+- `allow`: stock macOS behaviour; AWDL Guard stays out of the way.
+
+The 0.1.0 names `off` (= `block`) and `on` (= `allow`) are still accepted.
+
+Users can switch mode from the menu bar (*Mode*) or with `awdl-guardctl mode <auto|block|allow|default>`,
+no admin rights needed. The choice survives restarts; `default` goes back to the configured
+mode. `AllowUserModeChange` controls this: when it is not set, users may change the mode
+unless a profile enforces `Mode`.
 
 ### Exclusions
 
-While an exempt app is running, AWDL stays available in both `auto` and `off` modes
+While an exempt app is running, AWDL stays available in both `auto` and `block` modes
 (useful for apps used with Sidecar, Universal Control or AirPlay to a meeting-room TV,
 even during a call). Administrators set `ExemptApps`. With `AllowUserExemptions`, users
 can also add their own from the menu bar (*Exclusions → Add <app>* / *Choose App…*).
@@ -55,7 +62,8 @@ Preferences domain: `io.github.moragabriele.awdlguard`
 
 | Key | Type | Default | Notes |
 |---|---|---|---|
-| `Mode` | string | `auto` | `auto`, `off`, `on` |
+| `Mode` | string | `auto` | `auto`, `block`, `allow` |
+| `AllowUserModeChange` | bool | see notes | not set: users may change the mode unless a profile sets `Mode` |
 | `TriggerOnMicrophone` | bool | `true` | |
 | `TriggerOnGames` | bool | `true` | |
 | `TriggerApps` | array of strings | `[]` | bundle IDs, e.g. `us.zoom.xos` |
@@ -75,7 +83,7 @@ within 30 seconds, or immediately with `awdl-guardctl reload`.
 Without an MDM:
 
 ```bash
-sudo defaults write /Library/Preferences/io.github.moragabriele.awdlguard Mode -string off
+sudo defaults write /Library/Preferences/io.github.moragabriele.awdlguard Mode -string block
 awdl-guardctl reload
 ```
 
@@ -85,7 +93,7 @@ awdl-guardctl reload
 2. **Profile**: deploy `profiles/AWDLGuard.mobileconfig` as a custom profile, with
    your Team ID filled in. It carries both the settings and the background-items approval,
    so users see no "Background Items Added" notification and cannot turn the daemon off.
-   For granular control, make one copy per device group (for example `Mode=off` for a team
+   For granular control, make one copy per device group (for example `Mode=block` for a team
    that never uses AirDrop and `Mode=auto` for everyone else). Give each copy its own
    `PayloadIdentifier` and `PayloadUUID`s, and scope only one per Mac.
    - **Jamf Pro only (optional)**: instead of editing XML, upload `profiles/jamf-schema.json`

@@ -1,12 +1,21 @@
 import Foundation
 
 public enum Mode: String, Codable, CaseIterable, Sendable {
-    /// Never touch AWDL (stock macOS behaviour).
-    case on
-    /// Hold AWDL down at all times.
-    case off
     /// Hold AWDL down only while a trigger is active (call, game, listed app).
     case auto
+    /// Hold AWDL down at all times.
+    case block
+    /// Never touch AWDL (stock macOS behaviour).
+    case allow
+
+    /// Accepts the current names plus the 0.1.0 ones (`on` = allow, `off` = block).
+    public init?(parsing value: String) {
+        switch value.lowercased() {
+        case "on": self = .allow
+        case "off": self = .block
+        default: self.init(rawValue: value.lowercased())
+        }
+    }
 }
 
 public enum TriggerAppsMatch: String, Codable, Sendable {
@@ -18,6 +27,9 @@ public enum TriggerAppsMatch: String, Codable, Sendable {
 /// /Library/Preferences, which wins over the defaults below.
 public struct Settings: Codable, Equatable, Sendable {
     public var mode: Mode = .auto
+    /// Lets users pick the mode from the menu bar. nil (not set) means "yes, unless a
+    /// profile enforces Mode"; see `Policy.userModeAllowed`.
+    public var allowUserModeChange: Bool?
     public var triggerApps: [String] = []
     public var triggerAppsMatch: TriggerAppsMatch = .running
     public var triggerOnGames = true
@@ -37,6 +49,7 @@ public struct Settings: Codable, Equatable, Sendable {
 
     public enum Key: String, CaseIterable {
         case mode = "Mode"
+        case allowUserModeChange = "AllowUserModeChange"
         case triggerApps = "TriggerApps"
         case triggerAppsMatch = "TriggerAppsMatch"
         case triggerOnGames = "TriggerOnGames"
@@ -57,7 +70,8 @@ public struct Settings: Codable, Equatable, Sendable {
         func int(_ k: Key) -> Int? { (values[k.rawValue] as? NSNumber)?.intValue }
         func string(_ k: Key) -> String? { (values[k.rawValue] as? String)?.lowercased() }
 
-        if let v = string(.mode), let m = Mode(rawValue: v) { mode = m }
+        if let v = string(.mode), let m = Mode(parsing: v) { mode = m }
+        allowUserModeChange = bool(.allowUserModeChange)
         if let v = values[Key.triggerApps.rawValue] as? [String] { triggerApps = v }
         if let v = string(.triggerAppsMatch), let m = TriggerAppsMatch(rawValue: v) { triggerAppsMatch = m }
         if let v = bool(.triggerOnGames) { triggerOnGames = v }

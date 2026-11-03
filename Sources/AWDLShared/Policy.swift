@@ -76,6 +76,19 @@ public enum Policy {
         return exemptions.sorted()
     }
 
+    /// Users may choose the mode unless the administrator says otherwise. Without an explicit
+    /// AllowUserModeChange, a profile that enforces Mode wins over the user.
+    public static func userModeAllowed(settings: Settings, managedKeys: [String]) -> Bool {
+        settings.allowUserModeChange ?? !managedKeys.contains(Settings.Key.mode.rawValue)
+    }
+
+    public static func effectiveMode(settings: Settings, managedKeys: [String], userMode: Mode?) -> Mode {
+        if let userMode, userModeAllowed(settings: settings, managedKeys: managedKeys) {
+            return userMode
+        }
+        return settings.mode
+    }
+
     public static func decide(_ input: PolicyInput) -> PolicyDecision {
         let s = input.settings
         let triggers = s.mode == .auto ? activeTriggers(settings: s, reports: input.reports) : []
@@ -83,8 +96,8 @@ public enum Policy {
         if let until = input.overrideUntil, until > input.now, s.allowUserOverride {
             return PolicyDecision(allowAWDL: true, reason: "temporarily allowed by user", activeTriggers: triggers)
         }
-        if s.mode == .on {
-            return PolicyDecision(allowAWDL: true, reason: "mode is on", activeTriggers: [])
+        if s.mode == .allow {
+            return PolicyDecision(allowAWDL: true, reason: "mode is allow", activeTriggers: [])
         }
         let exemptions = activeExemptions(settings: s, reports: input.reports)
         if !exemptions.isEmpty {
@@ -94,8 +107,8 @@ public enum Policy {
         if s.onlyOnWiFi && !input.onWiFi {
             return PolicyDecision(allowAWDL: true, reason: "not using Wi-Fi", activeTriggers: triggers)
         }
-        if s.mode == .off {
-            return PolicyDecision(allowAWDL: false, reason: "mode is off", activeTriggers: [])
+        if s.mode == .block {
+            return PolicyDecision(allowAWDL: false, reason: "mode is block", activeTriggers: [])
         }
         if !triggers.isEmpty {
             return PolicyDecision(allowAWDL: false, reason: "trigger active", activeTriggers: triggers)
