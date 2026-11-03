@@ -95,25 +95,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func updateIcon() {
         guard let button = statusItem?.button else { return }
-        let symbol: String
-        let description: String
+        let state: String
         switch status?.awdlAllowed {
-        case .some(true):
-            symbol = "antenna.radiowaves.left.and.right"
-            description = "AWDL allowed"
-        case .some(false):
-            symbol = "antenna.radiowaves.left.and.right.slash"
-            description = "AWDL held down"
-        case .none:
-            symbol = "exclamationmark.triangle"
-            description = "AWDL Guard daemon not reachable"
+        case .some(true): state = "allowed"
+        case .some(false): state = "held"
+        case .none: state = "unreachable"
         }
         // Status refreshes every few seconds; touching the button each time makes AppKit
         // re-show hover UI wherever the pointer is. No tooltip: the menu already shows the state.
-        guard symbol != shownSymbol else { return }
-        shownSymbol = symbol
-        button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: description)
-        button.image?.isTemplate = true
+        guard state != shownSymbol else { return }
+        shownSymbol = state
+        if let allowed = status?.awdlAllowed {
+            button.image = MenuBarIcon.image(heldDown: !allowed)
+        } else {
+            button.image = NSImage(systemSymbolName: "exclamationmark.triangle",
+                                   accessibilityDescription: "AWDL Guard daemon not reachable")
+            button.image?.isTemplate = true
+        }
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {

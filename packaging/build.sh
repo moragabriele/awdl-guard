@@ -42,6 +42,8 @@ APP="$PAYLOAD/Applications/$APP_NAME"
 mkdir -p "$APP/Contents/MacOS"
 universal AWDLGuardAgent "$APP/Contents/MacOS/AWDLGuardAgent"
 sed "s/__VERSION__/$VERSION/g" "$ROOT/Resources/Agent-Info.plist" > "$APP/Contents/Info.plist"
+mkdir -p "$APP/Contents/Resources"
+cat "$ROOT/Resources/AppIcon.icns" > "$APP/Contents/Resources/AppIcon.icns"
 
 universal awdl-guardd "$PAYLOAD/Library/PrivilegedHelperTools/$DAEMON"
 universal awdl-guardctl "$PAYLOAD/usr/local/bin/awdl-guardctl"

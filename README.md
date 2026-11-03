@@ -1,3 +1,5 @@
+<img src="docs/icon.png" width="128" alt="AWDL Guard icon">
+
 # AWDL Guard
 
 Holds Apple Wireless Direct Link (AWDL) down on Macs when it hurts Wi-Fi latency, and
