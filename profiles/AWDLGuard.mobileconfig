@@ -7,6 +7,8 @@
   Payload 2: Managed Login Items (macOS 13+). Pre-approves the daemon and agent so users
              get no "Background Items Added" notification and cannot switch them off.
              Replace REPLACE_WITH_TEAM_ID with the Team ID of your Developer ID certificate.
+  Payload 3: Notifications. Allows the agent's notifications without asking the user
+             (temporary allow ending, schedule windows). Remove it to let users decide.
 
   For different settings per device group, duplicate this file, change the values and give
   each copy its own PayloadIdentifier and PayloadUUIDs (`uuidgen`). Scope one copy per Mac.
@@ -59,6 +61,14 @@
 			<true/>
 			<key>AllowUserQuit</key>
 			<false/>
+			<!-- Notifications: 1 minute before a temporary allow ends / when it ended,
+			     schedule window start and end, every AWDL change (noisy). -->
+			<key>NotifyOnOverrideEnd</key>
+			<true/>
+			<key>NotifyOnSchedule</key>
+			<true/>
+			<key>NotifyOnAWDLChange</key>
+			<false/>
 			<!-- Time windows with a fixed mode, winning over Mode and the user's choice. Example:
 			     <dict>
 			       <key>Days</key> <array><string>mon</string><string>fri</string></array>
@@ -97,6 +107,37 @@
 					<string>io.github.moragabriele.awdlguard</string>
 					<key>Comment</key>
 					<string>AWDL Guard launchd jobs</string>
+				</dict>
+			</array>
+		</dict>
+		<dict>
+			<key>PayloadType</key>
+			<string>com.apple.notificationsettings</string>
+			<key>PayloadIdentifier</key>
+			<string>io.github.moragabriele.awdlguard.profile.notifications</string>
+			<key>PayloadUUID</key>
+			<string>4E0C7B9A-6F2D-4C1E-9B8A-3D5F2A7C1E60</string>
+			<key>PayloadVersion</key>
+			<integer>1</integer>
+			<key>PayloadDisplayName</key>
+			<string>AWDL Guard notifications</string>
+			<key>NotificationSettings</key>
+			<array>
+				<dict>
+					<key>BundleIdentifier</key>
+					<string>io.github.moragabriele.awdlguard.agent</string>
+					<key>NotificationsEnabled</key>
+					<true/>
+					<key>AlertType</key>
+					<integer>1</integer>
+					<key>ShowInLockScreen</key>
+					<true/>
+					<key>ShowInNotificationCenter</key>
+					<true/>
+					<key>SoundsEnabled</key>
+					<true/>
+					<key>BadgesEnabled</key>
+					<false/>
 				</dict>
 			</array>
 		</dict>

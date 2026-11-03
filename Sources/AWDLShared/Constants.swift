@@ -1,7 +1,7 @@
 import Foundation
 
 public enum Constants {
-    public static let version = "0.2.0"
+    public static let version = "0.3.0"
 
     /// Preferences domain. MDM profiles use it as PayloadType; local admins can use
     /// `sudo defaults write /Library/Preferences/<domain> <Key> <value>`.

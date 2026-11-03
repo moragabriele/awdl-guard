@@ -8,6 +8,9 @@ private let log = Logger(subsystem: Constants.logSubsystem, category: "agent")
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let client = DaemonClient()
     private let activity = ActivityWatcher()
+    private let notifier = Notifier()
+    /// Length of the user's last temporary allow, reused by the notification's "Extend" button.
+    private var lastOverrideMinutes: Int?
     private var settings = Settings.load()
     private var status: DaemonStatus?
     private var statusItem: NSStatusItem?
@@ -24,6 +27,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         }
         activity.onChange = { [weak self] in self?.sendReport() }
+        notifier.onExtend = { [weak self] in
+            guard let self else { return }
+            self.requestOverride(minutes: self.lastOverrideMinutes ?? self.defaultOverrideMinutes)
+        }
         activity.start()
         timer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in self?.tick() }
         tick()
@@ -60,8 +67,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         proxy?.getStatus { [weak self] data in
             let s = data.flatMap { try? JSON.decoder.decode(DaemonStatus.self, from: $0) }
             DispatchQueue.main.async {
-                self?.status = s
-                self?.updateIcon()
+                guard let self else { return }
+                self.status = s
+                self.updateIcon()
+                self.notifier.extendMinutes = self.lastOverrideMinutes ?? self.defaultOverrideMinutes
+                self.notifier.update(status: s, settings: self.settings)
             }
         }
     }
@@ -139,8 +149,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let until = s.overrideUntil {
             let time = DateFormatter.localizedString(from: until, dateStyle: .none, timeStyle: .short)
             menu.addItem(action("End temporary allow (until \(time))", #selector(cancelOverride)))
-        } else if s.overrideAvailable && !s.awdlAllowed {
-            menu.addItem(action("Allow AirDrop/AirPlay for \(s.overrideMaxMinutes) min", #selector(requestOverride)))
+        }
+        if s.overrideAvailable && (!s.awdlAllowed || s.overrideUntil != nil) {
+            // Picking a length while an allow is running restarts it from now.
+            let item = NSMenuItem(title: "Allow AirDrop/AirPlay for", action: nil, keyEquivalent: "")
+            let sub = NSMenu()
+            for minutes in Policy.overrideChoices(maxMinutes: s.overrideMaxMinutes) {
+                let choice = action(Self.duration(minutes), #selector(requestOverrideFromMenu(_:)))
+                choice.representedObject = minutes
+                sub.addItem(choice)
+            }
+            item.submenu = sub
+            menu.addItem(item)
         }
 
         if s.userExemptionsAllowed || !s.exemptApps.isEmpty {
@@ -291,8 +311,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return item
     }
 
-    @objc private func requestOverride() {
-        let minutes = status?.overrideMaxMinutes ?? 15
+    private static func duration(_ minutes: Int) -> String {
+        if minutes % 60 == 0 {
+            return minutes == 60 ? "1 hour" : "\(minutes / 60) hours"
+        }
+        return minutes == 1 ? "1 minute" : "\(minutes) minutes"
+    }
+
+    private var defaultOverrideMinutes: Int {
+        min(15, status?.overrideMaxMinutes ?? settings.overrideMaxMinutes)
+    }
+
+    @objc private func requestOverrideFromMenu(_ sender: NSMenuItem) {
+        guard let minutes = sender.representedObject as? Int else { return }
+        lastOverrideMinutes = minutes
+        requestOverride(minutes: minutes)
+    }
+
+    private func requestOverride(minutes: Int) {
         client.proxy { _ in }?.requestOverride(minutes: minutes) { [weak self] ok, message in
             if !ok { log.error("override refused: \(message, privacy: .public)") }
             DispatchQueue.main.async { self?.refreshStatus() }
@@ -300,6 +336,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func cancelOverride() {
+        notifier.cancelOverrideWarning()
         client.proxy { _ in }?.cancelOverride { [weak self] _ in
             DispatchQueue.main.async { self?.refreshStatus() }
         }

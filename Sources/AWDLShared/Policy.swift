@@ -82,6 +82,11 @@ public enum Policy {
         settings.allowUserModeChange ?? !managedKeys.contains(Settings.Key.mode.rawValue)
     }
 
+    /// Durations offered for a temporary allow: a few common ones below the limit, then the limit.
+    public static func overrideChoices(maxMinutes: Int) -> [Int] {
+        [5, 15, 60, 240].filter { $0 < maxMinutes } + [maxMinutes]
+    }
+
     /// The first schedule window active at `now`, if any.
     public static func activeWindow(_ schedule: [ScheduleWindow], at now: Date,
                                     calendar: Calendar = .current) -> ActiveScheduleWindow? {

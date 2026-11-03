@@ -78,6 +78,16 @@ For Macs that must not wait for a profile, run
 `launchctl bootout system/io.github.moragabriele.awdlguard.daemon` as root (e.g. a Mosyle
 custom command): the daemon restores AWDL on exit and stays stopped until the next restart.
 
+### Temporary allow and notifications
+
+When AWDL is held down, users can allow it for a while from the menu bar (*Allow AirDrop/AirPlay
+for → 5 minutes, 15 minutes, …*), up to `OverrideMaxMinutes`. Picking again restarts the time
+from now. One minute before it ends a notification offers *Extend*.
+
+Notifications need the user's permission, which macOS asks for the first time. The profile's
+`com.apple.notificationsettings` payload grants it in advance; remove that payload to let users
+decide.
+
 ### Exclusions
 
 While an exempt app is running, AWDL stays available in both `auto` and `block` modes
@@ -107,9 +117,12 @@ Preferences domain: `io.github.moragabriele.awdlguard`
 | `OnlyOnWiFi` | bool | `true` | |
 | `ReenableDelaySeconds` | int | `30` | 0–3600 |
 | `AllowUserOverride` | bool | `true` | user can allow AWDL temporarily (AirDrop) |
-| `OverrideMaxMinutes` | int | `15` | 1–1440 |
+| `OverrideMaxMinutes` | int | `15` | 1–1440; the menu offers 5, 15, 60, 240 min below it, then the limit |
 | `ShowMenuBarIcon` | bool | `true` | |
 | `AllowUserQuit` | bool | `true` | hide Quit in the menu |
+| `NotifyOnOverrideEnd` | bool | `true` | 1 minute before a temporary allow ends (with *Extend*) and when it ended |
+| `NotifyOnSchedule` | bool | `true` | when a schedule window starts or ends |
+| `NotifyOnAWDLChange` | bool | `false` | every time AWDL is held down or allowed again |
 | `Schedule` | array of dicts | `[]` | `Days`, `Start`, `End`, `Mode`; see [Schedule](#schedule) |
 
 Precedence: MDM profile > `/Library/Preferences` > defaults. Changes are picked up

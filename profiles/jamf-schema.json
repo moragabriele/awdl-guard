@@ -176,6 +176,27 @@
         ]
       },
       "property_order": 15
+    },
+    "NotifyOnOverrideEnd": {
+      "title": "Notify when a temporary allow ends",
+      "description": "One minute before it ends (with an Extend button) and when it has ended.",
+      "type": "boolean",
+      "default": true,
+      "property_order": 16
+    },
+    "NotifyOnSchedule": {
+      "title": "Notify on schedule windows",
+      "description": "When a schedule window starts or ends.",
+      "type": "boolean",
+      "default": true,
+      "property_order": 17
+    },
+    "NotifyOnAWDLChange": {
+      "title": "Notify on every AWDL change",
+      "description": "Every time AWDL is held down or allowed again. Noisy.",
+      "type": "boolean",
+      "default": false,
+      "property_order": 18
     }
   }
 }

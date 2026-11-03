@@ -44,6 +44,12 @@ public struct Settings: Codable, Equatable, Sendable {
     public var overrideMaxMinutes = 15
     public var showMenuBarIcon = true
     public var allowUserQuit = true
+    /// Notify one minute before a temporary allow ends, and when it has ended.
+    public var notifyOnOverrideEnd = true
+    /// Notify when a schedule window starts or ends.
+    public var notifyOnSchedule = true
+    /// Notify every time AWDL is held down or allowed again (noisy; off by default).
+    public var notifyOnAWDLChange = false
     /// Time windows with a fixed mode; inside one, it wins over Mode and the user's choice.
     public var schedule: [ScheduleWindow] = []
 
@@ -65,6 +71,9 @@ public struct Settings: Codable, Equatable, Sendable {
         case showMenuBarIcon = "ShowMenuBarIcon"
         case allowUserQuit = "AllowUserQuit"
         case schedule = "Schedule"
+        case notifyOnOverrideEnd = "NotifyOnOverrideEnd"
+        case notifyOnSchedule = "NotifyOnSchedule"
+        case notifyOnAWDLChange = "NotifyOnAWDLChange"
     }
 
     /// Builds settings from raw key/value pairs; unknown or mistyped values fall back to defaults.
@@ -87,6 +96,9 @@ public struct Settings: Codable, Equatable, Sendable {
         if let v = int(.overrideMaxMinutes) { overrideMaxMinutes = min(max(v, 1), 1440) }
         if let v = bool(.showMenuBarIcon) { showMenuBarIcon = v }
         if let v = bool(.allowUserQuit) { allowUserQuit = v }
+        if let v = bool(.notifyOnOverrideEnd) { notifyOnOverrideEnd = v }
+        if let v = bool(.notifyOnSchedule) { notifyOnSchedule = v }
+        if let v = bool(.notifyOnAWDLChange) { notifyOnAWDLChange = v }
         if let v = values[Key.schedule.rawValue] as? [[String: Any]] {
             schedule = v.compactMap(ScheduleWindow.init(values:))
         }

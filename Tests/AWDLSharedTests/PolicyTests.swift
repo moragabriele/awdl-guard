@@ -226,4 +226,18 @@ private func settings(_ configure: (inout Settings) -> Void = { _ in }) -> Setti
         #expect(Policy.activeWindow(windows, at: date(day: 2, 12, 30), calendar: utc)?.window.mode == .allow)
         #expect(Policy.activeWindow(windows, at: date(day: 2, 14), calendar: utc)?.window.mode == .block)
     }
+
+    @Test func overrideChoicesEndAtTheLimit() {
+        #expect(Policy.overrideChoices(maxMinutes: 15) == [5, 15])
+        #expect(Policy.overrideChoices(maxMinutes: 60) == [5, 15, 60])
+        #expect(Policy.overrideChoices(maxMinutes: 90) == [5, 15, 60, 90])
+        #expect(Policy.overrideChoices(maxMinutes: 3) == [3])
+    }
+
+    @Test func notificationKeysDefaultsAndParsing() {
+        let d = Settings()
+        #expect(d.notifyOnOverrideEnd && d.notifyOnSchedule && !d.notifyOnAWDLChange)
+        let s = Settings(values: ["NotifyOnSchedule": false, "NotifyOnAWDLChange": true])
+        #expect(!s.notifyOnSchedule && s.notifyOnAWDLChange && s.notifyOnOverrideEnd)
+    }
 }
