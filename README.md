@@ -5,7 +5,7 @@
 <h1 align="center">AWDL Guard</h1>
 
 <p align="center">
-  Stops AirDrop's radio from causing Wi-Fi lag on Macs, when it matters, as your MDM decides.
+  Stops AirDrop's radio from causing Wi-Fi lag on Macs.
 </p>
 
 <p align="center">
@@ -20,12 +20,15 @@ To do that, the Wi-Fi radio keeps leaving your access point's channel, and traff
 latency spikes, choppy calls, sluggish browsing. macOS has no switch for it.
 
 AWDL Guard holds AWDL down during calls and games (or always, or on a schedule) and gives it
-back afterwards. In a [quick test](docs/benchmark.md):
+back afterwards. Ping to the router, two one-minute runs each ([details](docs/benchmark.md)):
 
-| Gateway latency | AWDL allowed | AWDL held down |
+| | AWDL on | AWDL held down |
 |---|---:|---:|
-| p95 | ~80 ms | 5.5 ms |
-| Replies over 30 ms, per minute | 84–143 | 0 |
+| Typical (median) | 3.6–4.5 ms | 2.8–2.9 ms |
+| Slowest 5% (p95) | 78–82 ms | **5.3–5.7 ms** |
+| Worst | 228–957 ms | **23–25 ms** |
+| Jitter | 20–30 ms | **~1 ms** |
+| Spikes over 30 ms, per minute | 84–143 | **0** |
 
 **Contents:** [Quick start](#quick-start) · [Modes](#modes) · [Configuration](#configuration) ·
 [MDM deployment](#mdm-deployment) · [Privacy](#privacy) · [Building](#building)
