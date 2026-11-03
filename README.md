@@ -1,64 +1,65 @@
-<img src="docs/icon.png" width="128" alt="AWDL Guard icon">
+<p align="center">
+  <img src="docs/icon.png" width="128" alt="AWDL Guard icon">
+</p>
 
-# AWDL Guard
+<h1 align="center">AWDL Guard</h1>
 
-Holds Apple Wireless Direct Link (AWDL) down on Macs when it hurts Wi-Fi latency, and
-lets an MDM (Mosyle, Jamf, Kandji, Intune, …) decide when, per device group.
+<p align="center">
+  Stops AirDrop's radio from causing Wi-Fi lag on Macs, when it matters, as your MDM decides.
+</p>
 
-AWDL powers AirDrop, AirPlay peer-to-peer, Sidecar, Universal Control and other
-Continuity features. To do that the Wi-Fi radio periodically leaves your access
-point's channel to listen on the AWDL channels (6, 44, 149). While it is away,
-traffic waits: you get latency spikes, choppy Zoom/Meet calls and sluggish browsing.
-macOS has no switch for this, and `sudo ifconfig awdl0 down` no longer sticks because
-the system brings the interface straight back up.
+<p align="center">
+  <a href="https://github.com/moragabriele/awdl-guard/releases/latest"><img src="https://img.shields.io/github/v/release/moragabriele/awdl-guard" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/macOS-13%2B-blue" alt="macOS 13+">
+  <img src="https://img.shields.io/badge/signed-notarized-brightgreen" alt="Signed and notarized">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="MIT license"></a>
+</p>
 
-In a [quick test](docs/benchmark.md) on an office network, holding AWDL down took p95 latency
-to the gateway from about 80 ms to 5.5 ms, and replies over 30 ms from 84-143 per minute to
-none.
+AWDL (Apple Wireless Direct Link) powers AirDrop, AirPlay, Sidecar and Universal Control.
+To do that, the Wi-Fi radio keeps leaving your access point's channel, and traffic waits:
+latency spikes, choppy calls, sluggish browsing. macOS has no switch for it.
 
-Built on the core of [AWDLControl](https://github.com/james-howard/AWDLControl) by
-James Howard (MIT), which keeps `awdl0` down by watching routing-socket events. This
-project adds an always-on daemon, MDM-managed configuration, call detection and
-installer packaging.
+AWDL Guard holds AWDL down during calls and games (or always, or on a schedule) and gives it
+back afterwards. In a [quick test](docs/benchmark.md):
 
-## How it works
+| Gateway latency | AWDL allowed | AWDL held down |
+|---|---:|---:|
+| p95 | ~80 ms | 5.5 ms |
+| Replies over 30 ms, per minute | 84–143 | 0 |
 
-| Component | Runs as | Job |
-|---|---|---|
-| `awdl-guardd` | root, LaunchDaemon | Reads policy, decides, holds `awdl0` down or hands it back to macOS. Always restores AWDL when stopped. |
-| `AWDL Guard.app` | each user, LaunchAgent | Reports frontmost/running apps and microphone use to the daemon; optional menu bar icon with status and temporary allow. |
-| `awdl-guardctl` | anyone | CLI: status (also `--json`), mode, temporary allow, reload. |
+**Contents:** [Quick start](#quick-start) · [Modes](#modes) · [Configuration](#configuration) ·
+[MDM deployment](#mdm-deployment) · [Privacy](#privacy) · [Building](#building)
 
-The daemon and agent talk over XPC. Release builds only accept clients signed by the
-same Developer ID team. All policy is enforced in the daemon, so a client can never do
-more than the configuration permits. Nothing is sent off the Mac.
+## Quick start
 
-### Modes
+1. Install `AWDLGuard-<version>.pkg` from the [latest release](https://github.com/moragabriele/awdl-guard/releases/latest).
+2. That's it: a shield appears in the menu bar and AWDL is held down during calls and games.
 
-- `auto` (default): AWDL is held down only while a trigger is active:
-  - **microphone in use** (Zoom, Teams, FaceTime, Google Meet in any browser);
-  - **game in the foreground** (same signals macOS uses for Game Mode);
-  - **listed apps** (`TriggerApps`), either while running or only when frontmost.
-  When the last trigger ends, AWDL comes back after `ReenableDelaySeconds`.
-- `block`: AWDL is always held down (best latency; no AirDrop/AirPlay/Sidecar).
-- `allow`: stock macOS behaviour; AWDL Guard stays out of the way.
+```bash
+awdl-guardctl status              # what it's doing and why
+awdl-guardctl mode block          # always hold AWDL down (auto | block | allow | default)
+awdl-guardctl allow 15            # AirDrop for 15 minutes
+```
 
-The 0.1.0 names `off` (= `block`) and `on` (= `allow`) are still accepted.
+Uninstall: `sudo "/Library/Application Support/AWDL Guard/uninstall.sh"`
 
-Users can switch mode from the menu bar (*Mode*) or with `awdl-guardctl mode <auto|block|allow|default>`,
-no admin rights needed. The choice survives restarts; `default` goes back to the configured
-mode. `AllowUserModeChange` controls this: when it is not set, users may change the mode
-unless a profile enforces `Mode`.
+## Modes
 
-### Schedule
+- **`auto`** (default): AWDL is held down while the microphone is in use (any call app or
+  browser), a game is in the foreground, or a listed app runs. It comes back 30 s after.
+- **`block`**: always held down. Best latency, no AirDrop, AirPlay or Sidecar.
+- **`allow`**: stock macOS.
 
-`Schedule` sets time windows with a fixed mode, for example block AWDL during office hours:
+Users switch mode from the menu bar or `awdl-guardctl mode`, unless the profile locks it.
+
+**Schedule**: windows with a fixed mode, e.g. block on weekdays 09:00–18:00. Inside a window
+it wins over everything else; windows may cross midnight; the first match wins.
 
 ```xml
 <key>Schedule</key>
 <array>
   <dict>
-    <key>Days</key>  <array><string>mon</string><string>tue</string><string>wed</string><string>thu</string><string>fri</string></array>
+    <key>Days</key>  <array><string>mon</string><string>fri</string></array>  <!-- optional -->
     <key>Start</key> <string>09:00</string>
     <key>End</key>   <string>18:00</string>
     <key>Mode</key>  <string>block</string>
@@ -66,69 +67,46 @@ unless a profile enforces `Mode`.
 </array>
 ```
 
-- Inside a window its mode wins over `Mode` and the user's choice; outside, those apply as usual.
-- `Days` is optional (default: every day). Times use the Mac's local time zone; `End` may be `24:00`.
-- A window whose end is not after its start runs past midnight (`22:00`–`06:00`) and belongs
-  to the day it starts on. If windows overlap, the first one listed wins.
-- Exempt apps and the temporary allow still work inside a window.
-- Invalid windows are ignored; `awdl-guardctl settings` shows what was understood.
+**Exclusions**: while an exempt app runs (e.g. one used with Sidecar), AWDL stays available,
+even during a call. Set by the admin, or by users if allowed.
 
-### Emergency: give AWDL back everywhere
+**Temporary allow**: from the menu bar, 5 minutes up to the admin's limit. A notification
+one minute before it ends offers *Extend*.
 
-Push a profile with `Mode` = `allow` and no `Schedule`: Macs apply it within 30 seconds.
-For Macs that must not wait for a profile, run
-`launchctl bootout system/io.github.moragabriele.awdlguard.daemon` as root (e.g. a Mosyle
-custom command): the daemon restores AWDL on exit and stays stopped until the next restart.
+**Wired Ethernet**: AWDL is left alone (`OnlyOnWiFi`). VPNs don't affect this.
 
-### Temporary allow and notifications
+**Emergency**: push a profile with `Mode` = `allow` and no `Schedule` (applied within 30 s), or
+run `launchctl bootout system/io.github.moragabriele.awdlguard.daemon` as root, which restores
+AWDL until the next restart.
 
-When AWDL is held down, users can allow it for a while from the menu bar (*Allow AirDrop/AirPlay
-for → 5 minutes, 15 minutes, …*), up to `OverrideMaxMinutes`. Picking again restarts the time
-from now. One minute before it ends a notification offers *Extend*.
-
-Notifications need the user's permission, which macOS asks for the first time. The profile's
-`com.apple.notificationsettings` payload grants it in advance; remove that payload to let users
-decide.
-
-### Exclusions
-
-While an exempt app is running, AWDL stays available in both `auto` and `block` modes
-(useful for apps used with Sidecar, Universal Control or AirPlay to a meeting-room TV,
-even during a call). Administrators set `ExemptApps`. With `AllowUserExemptions`, users
-can also add their own from the menu bar (*Exclusions → Add <app>* / *Choose App…*).
-Users' lists are stored in their own preferences and only honoured while the policy
-allows it.
-
-With `OnlyOnWiFi` (default), AWDL is left alone when the Mac is on wired Ethernet.
-VPNs are handled: what counts is the physical link, not the tunnel.
+While AWDL is held down, these don't work: AirDrop, peer-to-peer AirPlay, Sidecar, Universal
+Control, iPhone Mirroring, wireless Continuity Camera, Apple Watch unlock.
 
 ## Configuration
 
-Preferences domain: `io.github.moragabriele.awdlguard`
+Domain `io.github.moragabriele.awdlguard`. MDM profile > `/Library/Preferences` > defaults.
+Changes apply within 30 s, or at once with `awdl-guardctl reload`.
 
-| Key | Type | Default | Notes |
-|---|---|---|---|
-| `Mode` | string | `auto` | `auto`, `block`, `allow` |
-| `AllowUserModeChange` | bool | see notes | not set: users may change the mode unless a profile sets `Mode` |
-| `TriggerOnMicrophone` | bool | `true` | |
-| `TriggerOnGames` | bool | `true` | |
-| `TriggerApps` | array of strings | `[]` | bundle IDs, e.g. `us.zoom.xos` |
-| `TriggerAppsMatch` | string | `running` | `running` or `frontmost` |
-| `ExemptApps` | array of strings | `[]` | bundle IDs that keep AWDL available while running |
-| `AllowUserExemptions` | bool | `false` | users can add their own exempt apps |
-| `OnlyOnWiFi` | bool | `true` | |
-| `ReenableDelaySeconds` | int | `30` | 0–3600 |
-| `AllowUserOverride` | bool | `true` | user can allow AWDL temporarily (AirDrop) |
-| `OverrideMaxMinutes` | int | `15` | 1–1440; the menu offers 5, 15, 60, 240 min below it, then the limit |
-| `ShowMenuBarIcon` | bool | `true` | |
-| `AllowUserQuit` | bool | `true` | hide Quit in the menu |
-| `NotifyOnOverrideEnd` | bool | `true` | 1 minute before a temporary allow ends (with *Extend*) and when it ended |
-| `NotifyOnSchedule` | bool | `true` | when a schedule window starts or ends |
-| `NotifyOnAWDLChange` | bool | `false` | every time AWDL is held down or allowed again |
-| `Schedule` | array of dicts | `[]` | `Days`, `Start`, `End`, `Mode`; see [Schedule](#schedule) |
-
-Precedence: MDM profile > `/Library/Preferences` > defaults. Changes are picked up
-within 30 seconds, or immediately with `awdl-guardctl reload`.
+| Key | Default | |
+|---|---|---|
+| `Mode` | `auto` | `auto`, `block`, `allow` |
+| `AllowUserModeChange` | not set | not set: allowed unless the profile sets `Mode` |
+| `Schedule` | `[]` | `Days`, `Start`, `End`, `Mode` |
+| `TriggerOnMicrophone` | `true` | |
+| `TriggerOnGames` | `true` | |
+| `TriggerApps` | `[]` | bundle IDs, e.g. `us.zoom.xos` |
+| `TriggerAppsMatch` | `running` | or `frontmost` |
+| `ExemptApps` | `[]` | bundle IDs |
+| `AllowUserExemptions` | `false` | users add their own from the menu |
+| `OnlyOnWiFi` | `true` | |
+| `ReenableDelaySeconds` | `30` | 0–3600 |
+| `AllowUserOverride` | `true` | temporary allow from the menu |
+| `OverrideMaxMinutes` | `15` | 1–1440 |
+| `NotifyOnOverrideEnd` | `true` | |
+| `NotifyOnSchedule` | `true` | |
+| `NotifyOnAWDLChange` | `false` | every change; noisy |
+| `ShowMenuBarIcon` | `true` | |
+| `AllowUserQuit` | `true` | `false` hides *Quit* |
 
 Without an MDM:
 
@@ -137,77 +115,48 @@ sudo defaults write /Library/Preferences/io.github.moragabriele.awdlguard Mode -
 awdl-guardctl reload
 ```
 
-## Deploying with an MDM
+## MDM deployment
 
-1. **Package**: upload `AWDLGuard-<version>.pkg` from the
-   [releases](https://github.com/moragabriele/awdl-guard/releases) (signed and notarized).
-2. **Profile**: deploy `profiles/AWDLGuard.mobileconfig` as a custom profile. It is set up for
-   the official releases (Team ID `9WCXJSYTFT`); if you sign your own builds, put your Team ID
-   in its `TeamIdentifier` rule. It carries the settings and pre-approves background items and
-   notifications, so users see no "Background Items Added" notification and cannot turn the daemon off.
-   For granular control, make one copy per device group (for example `Mode=block` for a team
-   that never uses AirDrop and `Mode=auto` for everyone else). Give each copy its own
-   `PayloadIdentifier` and `PayloadUUID`s, and scope only one per Mac.
-   - **Jamf Pro only (optional)**: instead of editing XML, upload `profiles/jamf-schema.json`
-     under *Application & Custom Settings → External Applications → Custom Schema* to get a
-     form for the settings. Background items still need the `com.apple.servicemanagement`
-     payload (Jamf: *Managed Login Items*).
-3. **Inventory** (optional): `scripts/mdm-status.sh` prints one line per Mac
-   (`held-down mode=auto version=0.1.0`) for custom attributes / extension attributes.
-4. **Uninstall**: run
-   `/Library/Application Support/AWDL Guard/uninstall.sh` as root, then remove the
-   profiles.
+Works with any MDM (Mosyle, Jamf, Kandji, Intune, …).
+
+1. **Package**: the `.pkg` from the [releases](https://github.com/moragabriele/awdl-guard/releases).
+2. **Profile**: [`profiles/AWDLGuard.mobileconfig`](profiles/AWDLGuard.mobileconfig) as a custom
+   profile. It holds the settings and pre-approves background items and notifications, so users
+   see no prompts and can't disable the background service. For different settings per group,
+   duplicate it with new `PayloadIdentifier`/`PayloadUUID`s and scope one per Mac. If you sign
+   your own builds, replace the Team ID `9WCXJSYTFT` in it.
+   Jamf can use [`profiles/jamf-schema.json`](profiles/jamf-schema.json) for a settings form.
+3. **Inventory**: [`scripts/mdm-status.sh`](scripts/mdm-status.sh) prints e.g.
+   `held-down mode=auto version=0.3.1` for an extension attribute.
+4. **Uninstall**: run the uninstall script above as root, then remove the profile.
+
+## Privacy
+
+Everything stays on the Mac. The microphone check only asks macOS *whether* an app is using
+input, never records it, and needs no permission. The daemon accepts commands only from
+binaries signed by the same Developer ID.
 
 ## Building
 
-Requires macOS 13+ to run and the Xcode Command Line Tools (Swift 5.10+) to build.
+macOS 13+, Xcode Command Line Tools (Swift 5.10+).
 
 ```bash
-make build      # debug build
-make test       # policy unit tests
-make pkg        # universal .pkg in dist/ (ad-hoc signed: local testing only)
+make test        # unit tests
+make pkg         # universal .pkg in dist/, ad-hoc signed (testing only)
+make icon        # regenerate the app icon
 ```
 
-Release build (Developer ID certificates in your keychain, notary credentials stored once
-with `xcrun notarytool store-credentials`):
+Release: set `APP_IDENTITY`, `PKG_IDENTITY` and `NOTARY_PROFILE` (see
+[`packaging/build.sh`](packaging/build.sh)). Measure your own network with
+[`scripts/latency-bench.sh`](scripts/latency-bench.sh). Logs:
 
 ```bash
-APP_IDENTITY="Developer ID Application: <Name> (<TEAMID>)" \
-PKG_IDENTITY="Developer ID Installer: <Name> (<TEAMID>)" \
-NOTARY_PROFILE=<profile-name> \
-./packaging/build.sh
+/usr/bin/log stream --predicate 'subsystem == "io.github.moragabriele.awdlguard"'
 ```
 
-Ad-hoc builds accept any local XPC client and log a warning; use them only for testing.
-
-## Measuring the difference
-
-```bash
-./scripts/latency-bench.sh 120           # pings the default gateway for 2 minutes
-```
-
-Run it with AWDL allowed and again with it held down, doing the same thing on the Mac
-each time. Each run appends a row (p50/p95/p99, jitter, spikes) to `latency-results.csv`.
-See [docs/benchmark.md](docs/benchmark.md) for an example run and how to read it.
-
-## Network-side mitigation
-
-Placing the access point's 5 GHz primary channel on 44 (or 149 where permitted) reduces
-how far the radio has to hop, because those are AWDL channels. It helps, but does not
-remove the off-channel time.
-
-## Trade-offs
-
-While AWDL is held down, these do not work: AirDrop, AirPlay to nearby devices without
-shared Wi-Fi, Sidecar, Universal Control, iPhone Mirroring, wireless Continuity Camera
-and Apple Watch unlock. Use `auto` mode or the temporary allow when you need them.
-
-## Logs
-
-```bash
-log stream --predicate 'subsystem == "io.github.moragabriele.awdlguard"'
-```
+Tip: putting the access point's 5 GHz channel on 44 or 149 (AWDL channels) reduces the
+hopping, but doesn't remove it.
 
 ## License
 
-MIT. See [LICENSE](LICENSE). Contains code from AWDLControl © James Howard.
+MIT. Built on [AWDLControl](https://github.com/james-howard/AWDLControl) by James Howard (MIT).
