@@ -79,7 +79,8 @@ pkgbuild --root "$PAYLOAD" --component-plist "$WORK/components.plist" \
 
 PKG="$OUT/AWDLGuard-$VERSION.pkg"
 if [ -n "${PKG_IDENTITY:-}" ]; then
-    productbuild --package "$WORK/component.pkg" --sign "$PKG_IDENTITY" "$PKG"
+    # Timestamped, so the package stays valid after the certificate expires.
+    productbuild --package "$WORK/component.pkg" --sign "$PKG_IDENTITY" --timestamp "$PKG"
 else
     productbuild --package "$WORK/component.pkg" "$PKG"
 fi

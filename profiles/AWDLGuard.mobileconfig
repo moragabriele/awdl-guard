@@ -6,7 +6,8 @@
   Payload 1: settings. Every key is optional; omitted keys use the defaults in README.md.
   Payload 2: Managed Login Items (macOS 13+). Pre-approves the daemon and agent so users
              get no "Background Items Added" notification and cannot switch them off.
-             Replace REPLACE_WITH_TEAM_ID with the Team ID of your Developer ID certificate.
+             9WCXJSYTFT is the Team ID of the official releases; if you build and sign
+             AWDL Guard yourself, use your own Team ID.
   Payload 3: Notifications. Allows the agent's notifications without asking the user
              (temporary allow ending, schedule windows). Remove it to let users decide.
 
@@ -96,7 +97,7 @@
 					<key>RuleType</key>
 					<string>TeamIdentifier</string>
 					<key>RuleValue</key>
-					<string>REPLACE_WITH_TEAM_ID</string>
+					<string>9WCXJSYTFT</string>
 					<key>Comment</key>
 					<string>AWDL Guard (signed binaries)</string>
 				</dict>

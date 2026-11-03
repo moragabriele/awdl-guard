@@ -137,10 +137,12 @@ awdl-guardctl reload
 
 ## Deploying with an MDM
 
-1. **Package**: upload `AWDLGuard-<version>.pkg` (signed and notarized, see below).
-2. **Profile**: deploy `profiles/AWDLGuard.mobileconfig` as a custom profile, with
-   your Team ID filled in. It carries both the settings and the background-items approval,
-   so users see no "Background Items Added" notification and cannot turn the daemon off.
+1. **Package**: upload `AWDLGuard-<version>.pkg` from the
+   [releases](https://github.com/moragabriele/awdl-guard/releases) (signed and notarized).
+2. **Profile**: deploy `profiles/AWDLGuard.mobileconfig` as a custom profile. It is set up for
+   the official releases (Team ID `9WCXJSYTFT`); if you sign your own builds, put your Team ID
+   in its `TeamIdentifier` rule. It carries the settings and pre-approves background items and
+   notifications, so users see no "Background Items Added" notification and cannot turn the daemon off.
    For granular control, make one copy per device group (for example `Mode=block` for a team
    that never uses AirDrop and `Mode=auto` for everyone else). Give each copy its own
    `PayloadIdentifier` and `PayloadUUID`s, and scope only one per Mac.
