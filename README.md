@@ -125,7 +125,10 @@ Works with any MDM (Mosyle, Jamf, Kandji, Intune, …).
    see no prompts and can't disable the background service. For different settings per group,
    duplicate it with new `PayloadIdentifier`/`PayloadUUID`s and scope one per Mac. If you sign
    your own builds, replace the Team ID `9WCXJSYTFT` in it.
-   Jamf can use [`profiles/jamf-schema.json`](profiles/jamf-schema.json) for a settings form.
+   For a settings form instead of XML: [`profiles/jamf-schema.json`](profiles/jamf-schema.json)
+   (Jamf custom schema) or [`profiles/io.github.moragabriele.awdlguard.plist`](profiles/io.github.moragabriele.awdlguard.plist)
+   (ProfileManifests: iMazing Profile Editor, ProfileCreator), generated from the Jamf schema by
+   `profiles/make-manifest.py`.
 3. **Inventory**: [`scripts/mdm-status.sh`](scripts/mdm-status.sh) prints e.g.
    `held-down mode=auto version=0.3.1` for an extension attribute.
 4. **Uninstall**: run the uninstall script above as root, then remove the profile.
