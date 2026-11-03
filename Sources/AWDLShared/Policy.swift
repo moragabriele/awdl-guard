@@ -82,7 +82,23 @@ public enum Policy {
         settings.allowUserModeChange ?? !managedKeys.contains(Settings.Key.mode.rawValue)
     }
 
-    public static func effectiveMode(settings: Settings, managedKeys: [String], userMode: Mode?) -> Mode {
+    /// The first schedule window active at `now`, if any.
+    public static func activeWindow(_ schedule: [ScheduleWindow], at now: Date,
+                                    calendar: Calendar = .current) -> ActiveScheduleWindow? {
+        for window in schedule {
+            if let until = window.end(ifActiveAt: now, calendar: calendar) {
+                return ActiveScheduleWindow(window: window, until: until)
+            }
+        }
+        return nil
+    }
+
+    /// An active schedule window wins; otherwise the user's choice when allowed, else Mode.
+    public static func effectiveMode(settings: Settings, managedKeys: [String], userMode: Mode?,
+                                     now: Date = Date()) -> Mode {
+        if let active = activeWindow(settings.schedule, at: now) {
+            return active.window.mode
+        }
         if let userMode, userModeAllowed(settings: settings, managedKeys: managedKeys) {
             return userMode
         }

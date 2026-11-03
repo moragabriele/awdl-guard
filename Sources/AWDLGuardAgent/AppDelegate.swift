@@ -124,7 +124,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if !s.activeExemptions.isEmpty {
             menu.addItem(disabled("Excluded: \(s.activeExemptions.map(Self.appName).joined(separator: ", "))"))
         }
-        if s.modeChangeAllowed {
+        if let until = s.scheduleUntil {
+            let time = DateFormatter.localizedString(from: until, dateStyle: .none, timeStyle: .short)
+            menu.addItem(disabled("Mode: \(Self.modeTitle(s.mode)) (scheduled until \(time))"))
+        } else if s.modeChangeAllowed {
             let item = NSMenuItem(title: "Mode: \(Self.modeTitle(s.mode))", action: nil, keyEquivalent: "")
             item.submenu = modeMenu(status: s)
             menu.addItem(item)

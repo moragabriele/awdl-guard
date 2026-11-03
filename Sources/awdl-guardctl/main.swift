@@ -25,7 +25,12 @@ func printStatus(_ s: DaemonStatus) {
     df.timeStyle = .short
     print("AWDL:          \(s.awdlAllowed ? "allowed" : "held down") (\(s.reason))")
     print("awdl0:         \(s.interfaceState)")
-    let source = s.userMode != nil && s.mode == s.userMode ? "chosen by user" : "policy"
+    let source: String
+    if let until = s.scheduleUntil {
+        source = "schedule until \(df.string(from: until))"
+    } else {
+        source = s.userMode != nil && s.mode == s.userMode ? "chosen by user" : "policy"
+    }
     print("Mode:          \(s.mode.rawValue) (\(source)\(s.modeChangeAllowed ? "" : ", locked"))")
     print("Wi-Fi in use:  \(s.onWiFi ? "yes" : "no")")
     print("Triggers:      \(s.activeTriggers.isEmpty ? "none" : s.activeTriggers.joined(separator: ", "))")

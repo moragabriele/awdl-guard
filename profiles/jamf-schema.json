@@ -64,7 +64,7 @@
     },
     "ExemptApps": {
       "title": "Exempt apps",
-      "description": "Bundle identifiers that keep AWDL available while running, in auto and off modes (e.g. apps used with Sidecar or AirPlay).",
+      "description": "Bundle identifiers that keep AWDL available while running, in auto and block modes (e.g. apps used with Sidecar or AirPlay).",
       "type": "array",
       "items": {
         "type": "string",
@@ -123,6 +123,59 @@
       "type": "boolean",
       "default": true,
       "property_order": 14
+    },
+    "Schedule": {
+      "title": "Schedule",
+      "description": "Time windows with a fixed mode. Inside a window its mode wins over Mode and the user's choice; the first matching window wins. A window whose end is not after its start runs past midnight.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "title": "Window",
+        "properties": {
+          "Days": {
+            "title": "Days",
+            "description": "Leave empty for every day.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "mon",
+                "tue",
+                "wed",
+                "thu",
+                "fri",
+                "sat",
+                "sun"
+              ]
+            }
+          },
+          "Start": {
+            "title": "Start (HH:mm)",
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "End": {
+            "title": "End (HH:mm, 24:00 allowed)",
+            "type": "string",
+            "pattern": "^(([01][0-9]|2[0-3]):[0-5][0-9]|24:00)$"
+          },
+          "Mode": {
+            "title": "Mode",
+            "type": "string",
+            "enum": [
+              "auto",
+              "block",
+              "allow"
+            ]
+          }
+        },
+        "required": [
+          "Start",
+          "End",
+          "Mode"
+        ]
+      },
+      "property_order": 15
     }
   }
 }

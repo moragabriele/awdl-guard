@@ -58,12 +58,15 @@ public struct DaemonStatus: Codable, Sendable {
     public var overrideMaxMinutes: Int
     public var managedKeys: [String]
     public var connectedAgents: Int
+    /// Set while a schedule window is active: its mode is `mode` until then.
+    public var scheduleUntil: Date?
 
     public init(version: String, mode: Mode, policyMode: Mode, userMode: Mode?, modeChangeAllowed: Bool,
                 awdlAllowed: Bool, interfaceState: String, reason: String,
                 activeTriggers: [String], activeExemptions: [String], exemptApps: [String],
                 userExemptionsAllowed: Bool, onWiFi: Bool, overrideUntil: Date?, overrideAvailable: Bool,
-                overrideMaxMinutes: Int, managedKeys: [String], connectedAgents: Int) {
+                overrideMaxMinutes: Int, managedKeys: [String], connectedAgents: Int,
+                scheduleUntil: Date? = nil) {
         self.version = version
         self.mode = mode
         self.policyMode = policyMode
@@ -82,5 +85,6 @@ public struct DaemonStatus: Codable, Sendable {
         self.overrideMaxMinutes = overrideMaxMinutes
         self.managedKeys = managedKeys
         self.connectedAgents = connectedAgents
+        self.scheduleUntil = scheduleUntil
     }
 }

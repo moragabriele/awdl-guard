@@ -21,6 +21,8 @@ final class Daemon: NSObject, NSXPCListenerDelegate {
     private var reports: [ObjectIdentifier: ActivityReport] = [:]
     private var overrideUntil: Date?
     private var lastTriggerSeen: Date?
+    /// End of the active schedule window, tracked only to log window changes.
+    private var scheduleUntil: Date?
     private var decision = PolicyDecision(allowAWDL: true, reason: "starting", activeTriggers: [])
     // AWDLMonitor starts with AWDL enabled and does not touch the interface until told otherwise.
     private var appliedAllow = true
@@ -79,10 +81,10 @@ final class Daemon: NSObject, NSXPCListenerDelegate {
         }
     }
 
-    /// Settings with the mode actually in force (the user's choice when allowed).
-    private var effective: Settings {
+    /// Settings with the mode actually in force (schedule, then the user's choice when allowed).
+    private func effective(at now: Date = Date()) -> Settings {
         var s = settings
-        s.mode = Policy.effectiveMode(settings: settings, managedKeys: managedKeys, userMode: userMode)
+        s.mode = Policy.effectiveMode(settings: settings, managedKeys: managedKeys, userMode: userMode, now: now)
         return s
     }
 
@@ -118,7 +120,17 @@ final class Daemon: NSObject, NSXPCListenerDelegate {
             log.info("User override expired")
         }
 
-        let current = effective
+        let window = Policy.activeWindow(settings.schedule, at: now)
+        if window?.until != scheduleUntil {
+            if let window {
+                log.notice("Schedule window active: mode \(window.window.mode.rawValue, privacy: .public) until \(window.until, privacy: .public)")
+            } else {
+                log.notice("Schedule window ended")
+            }
+            scheduleUntil = window?.until
+        }
+
+        let current = effective(at: now)
         let triggers = current.mode == .auto
             ? Policy.activeTriggers(settings: current, reports: Array(reports.values))
             : []
@@ -147,7 +159,8 @@ final class Daemon: NSObject, NSXPCListenerDelegate {
         case .down: iface = "down"
         default: iface = "missing"
         }
-        let current = effective
+        let now = Date()
+        let current = effective(at: now)
         return DaemonStatus(
             version: Constants.version, mode: current.mode, policyMode: settings.mode, userMode: userMode,
             modeChangeAllowed: Policy.userModeAllowed(settings: settings, managedKeys: managedKeys),
@@ -158,7 +171,8 @@ final class Daemon: NSObject, NSXPCListenerDelegate {
             onWiFi: network.onWiFi, overrideUntil: overrideUntil,
             overrideAvailable: settings.allowUserOverride && current.mode != .allow,
             overrideMaxMinutes: settings.overrideMaxMinutes, managedKeys: managedKeys,
-            connectedAgents: reports.count
+            connectedAgents: reports.count,
+            scheduleUntil: Policy.activeWindow(settings.schedule, at: now)?.until
         )
     }
 
@@ -189,7 +203,7 @@ final class Daemon: NSObject, NSXPCListenerDelegate {
             guard self.settings.allowUserOverride else {
                 return reply(false, "Temporary override is disabled by policy")
             }
-            guard self.effective.mode != .allow else {
+            guard self.effective().mode != .allow else {
                 return reply(false, "AWDL is already allowed")
             }
             let m = min(max(minutes, 1), self.settings.overrideMaxMinutes)
@@ -224,7 +238,7 @@ final class Daemon: NSObject, NSXPCListenerDelegate {
             self.saveState()
             log.notice("User mode set to \(self.userMode?.rawValue ?? "default", privacy: .public)")
             self.evaluate()
-            reply(true, "Mode is now \(self.effective.mode.rawValue)")
+            reply(true, "Mode is now \(self.effective().mode.rawValue)")
         }
     }
 

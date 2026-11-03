@@ -10,6 +10,10 @@ traffic waits: you get latency spikes, choppy Zoom/Meet calls and sluggish brows
 macOS has no switch for this, and `sudo ifconfig awdl0 down` no longer sticks because
 the system brings the interface straight back up.
 
+In a [quick test](docs/benchmark.md) on an office network, holding AWDL down took p95 latency
+to the gateway from about 80 ms to 5.5 ms, and replies over 30 ms from 84-143 per minute to
+none.
+
 Built on the core of [AWDLControl](https://github.com/james-howard/AWDLControl) by
 James Howard (MIT), which keeps `awdl0` down by watching routing-socket events. This
 project adds an always-on daemon, MDM-managed configuration, call detection and
@@ -44,6 +48,36 @@ no admin rights needed. The choice survives restarts; `default` goes back to the
 mode. `AllowUserModeChange` controls this: when it is not set, users may change the mode
 unless a profile enforces `Mode`.
 
+### Schedule
+
+`Schedule` sets time windows with a fixed mode, for example block AWDL during office hours:
+
+```xml
+<key>Schedule</key>
+<array>
+  <dict>
+    <key>Days</key>  <array><string>mon</string><string>tue</string><string>wed</string><string>thu</string><string>fri</string></array>
+    <key>Start</key> <string>09:00</string>
+    <key>End</key>   <string>18:00</string>
+    <key>Mode</key>  <string>block</string>
+  </dict>
+</array>
+```
+
+- Inside a window its mode wins over `Mode` and the user's choice; outside, those apply as usual.
+- `Days` is optional (default: every day). Times use the Mac's local time zone; `End` may be `24:00`.
+- A window whose end is not after its start runs past midnight (`22:00`–`06:00`) and belongs
+  to the day it starts on. If windows overlap, the first one listed wins.
+- Exempt apps and the temporary allow still work inside a window.
+- Invalid windows are ignored; `awdl-guardctl settings` shows what was understood.
+
+### Emergency: give AWDL back everywhere
+
+Push a profile with `Mode` = `allow` and no `Schedule`: Macs apply it within 30 seconds.
+For Macs that must not wait for a profile, run
+`launchctl bootout system/io.github.moragabriele.awdlguard.daemon` as root (e.g. a Mosyle
+custom command): the daemon restores AWDL on exit and stays stopped until the next restart.
+
 ### Exclusions
 
 While an exempt app is running, AWDL stays available in both `auto` and `block` modes
@@ -76,6 +110,7 @@ Preferences domain: `io.github.moragabriele.awdlguard`
 | `OverrideMaxMinutes` | int | `15` | 1–1440 |
 | `ShowMenuBarIcon` | bool | `true` | |
 | `AllowUserQuit` | bool | `true` | hide Quit in the menu |
+| `Schedule` | array of dicts | `[]` | `Days`, `Start`, `End`, `Mode`; see [Schedule](#schedule) |
 
 Precedence: MDM profile > `/Library/Preferences` > defaults. Changes are picked up
 within 30 seconds, or immediately with `awdl-guardctl reload`.
@@ -136,6 +171,7 @@ Ad-hoc builds accept any local XPC client and log a warning; use them only for t
 
 Run it with AWDL allowed and again with it held down, doing the same thing on the Mac
 each time. Each run appends a row (p50/p95/p99, jitter, spikes) to `latency-results.csv`.
+See [docs/benchmark.md](docs/benchmark.md) for an example run and how to read it.
 
 ## Network-side mitigation
 

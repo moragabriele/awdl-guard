@@ -44,6 +44,8 @@ public struct Settings: Codable, Equatable, Sendable {
     public var overrideMaxMinutes = 15
     public var showMenuBarIcon = true
     public var allowUserQuit = true
+    /// Time windows with a fixed mode; inside one, it wins over Mode and the user's choice.
+    public var schedule: [ScheduleWindow] = []
 
     public init() {}
 
@@ -62,6 +64,7 @@ public struct Settings: Codable, Equatable, Sendable {
         case overrideMaxMinutes = "OverrideMaxMinutes"
         case showMenuBarIcon = "ShowMenuBarIcon"
         case allowUserQuit = "AllowUserQuit"
+        case schedule = "Schedule"
     }
 
     /// Builds settings from raw key/value pairs; unknown or mistyped values fall back to defaults.
@@ -84,6 +87,9 @@ public struct Settings: Codable, Equatable, Sendable {
         if let v = int(.overrideMaxMinutes) { overrideMaxMinutes = min(max(v, 1), 1440) }
         if let v = bool(.showMenuBarIcon) { showMenuBarIcon = v }
         if let v = bool(.allowUserQuit) { allowUserQuit = v }
+        if let v = values[Key.schedule.rawValue] as? [[String: Any]] {
+            schedule = v.compactMap(ScheduleWindow.init(values:))
+        }
     }
 
     public static func load(domain: String = Constants.preferencesDomain) -> Settings {

@@ -59,6 +59,15 @@
 			<true/>
 			<key>AllowUserQuit</key>
 			<false/>
+			<!-- Time windows with a fixed mode, winning over Mode and the user's choice. Example:
+			     <dict>
+			       <key>Days</key> <array><string>mon</string><string>fri</string></array>
+			       <key>Start</key><string>09:00</string>
+			       <key>End</key>  <string>18:00</string>
+			       <key>Mode</key> <string>block</string>
+			     </dict> -->
+			<key>Schedule</key>
+			<array/>
 		</dict>
 		<dict>
 			<key>PayloadType</key>

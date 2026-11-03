@@ -162,4 +162,68 @@ private func settings(_ configure: (inout Settings) -> Void = { _ in }) -> Setti
         #expect(Settings(values: [:]).allowUserModeChange == nil)
         #expect(Settings(values: ["AllowUserModeChange": true]).allowUserModeChange == true)
     }
+
+    // MARK: - Schedule
+
+    private var utc: Calendar {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = TimeZone(identifier: "UTC")!
+        return c
+    }
+
+    /// 2026-11-02 is a Monday.
+    private func date(day: Int, _ hour: Int, _ minute: Int = 0, calendar: Calendar? = nil) -> Date {
+        (calendar ?? utc).date(from: DateComponents(year: 2026, month: 11, day: day, hour: hour, minute: minute))!
+    }
+
+    @Test func scheduleParsing() {
+        let w = ScheduleWindow(values: ["Days": ["Mon", "friday"], "Start": "09:00", "End": "18:30", "Mode": "block"])
+        #expect(w == ScheduleWindow(days: [2, 6], start: 540, end: 1110, mode: .block))
+        #expect(ScheduleWindow(values: ["Start": "00:00", "End": "24:00", "Mode": "allow"])?.days == Set(1...7))
+        #expect(ScheduleWindow(values: ["Start": "9", "End": "18:00", "Mode": "block"]) == nil)
+        #expect(ScheduleWindow(values: ["Start": "09:00", "End": "25:00", "Mode": "block"]) == nil)
+        #expect(ScheduleWindow(values: ["Start": "09:00", "End": "18:00", "Mode": "bogus"]) == nil)
+        #expect(ScheduleWindow(values: ["Days": ["xyz"], "Start": "09:00", "End": "18:00", "Mode": "block"]) == nil)
+        let s = Settings(values: ["Schedule": [["Start": "09:00", "End": "18:00", "Mode": "block"], ["Start": "bad"]]])
+        #expect(s.schedule.count == 1)
+    }
+
+    @Test func scheduleDaytimeWindow() {
+        let w = ScheduleWindow(days: [2, 3, 4, 5, 6], start: 540, end: 1080, mode: .block)
+        #expect(w.end(ifActiveAt: date(day: 2, 9), calendar: utc) == date(day: 2, 18))
+        #expect(w.end(ifActiveAt: date(day: 2, 17, 59), calendar: utc) != nil)
+        #expect(w.end(ifActiveAt: date(day: 2, 18), calendar: utc) == nil)
+        #expect(w.end(ifActiveAt: date(day: 2, 8, 59), calendar: utc) == nil)
+        #expect(w.end(ifActiveAt: date(day: 1, 12), calendar: utc) == nil) // Sunday
+    }
+
+    @Test func scheduleOvernightWindowBelongsToStartDay() {
+        let friday = ScheduleWindow(days: [6], start: 1320, end: 360, mode: .allow)
+        #expect(friday.end(ifActiveAt: date(day: 6, 23), calendar: utc) == date(day: 7, 6))
+        #expect(friday.end(ifActiveAt: date(day: 7, 5), calendar: utc) == date(day: 7, 6))  // Saturday morning
+        #expect(friday.end(ifActiveAt: date(day: 7, 23), calendar: utc) == nil)            // Saturday night
+        #expect(friday.end(ifActiveAt: date(day: 6, 5), calendar: utc) == nil)             // Friday morning
+    }
+
+    @Test func scheduleWinsOverModeAndUserChoice() {
+        let cal = Calendar.current
+        let s = settings {
+            $0.mode = .allow
+            $0.schedule = [ScheduleWindow(days: [2], start: 540, end: 1080, mode: .block)]
+        }
+        let inside = date(day: 2, 10, calendar: cal)
+        let outside = date(day: 2, 20, calendar: cal)
+        #expect(Policy.effectiveMode(settings: s, managedKeys: [], userMode: .auto, now: inside) == .block)
+        #expect(Policy.effectiveMode(settings: s, managedKeys: [], userMode: .auto, now: outside) == .auto)
+        #expect(Policy.effectiveMode(settings: s, managedKeys: ["Mode"], userMode: .auto, now: outside) == .allow)
+    }
+
+    @Test func firstMatchingWindowWins() {
+        let windows = [
+            ScheduleWindow(days: [2], start: 720, end: 780, mode: .allow),
+            ScheduleWindow(days: [2], start: 540, end: 1080, mode: .block),
+        ]
+        #expect(Policy.activeWindow(windows, at: date(day: 2, 12, 30), calendar: utc)?.window.mode == .allow)
+        #expect(Policy.activeWindow(windows, at: date(day: 2, 14), calendar: utc)?.window.mode == .block)
+    }
 }
