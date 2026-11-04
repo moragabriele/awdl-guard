@@ -122,7 +122,8 @@ awdl-guardctl reload
 
 Works with any MDM (Mosyle, Jamf, Kandji, Intune, …).
 
-1. **Package**: the `.pkg` from the [releases](https://github.com/moragabriele/awdl-guard/releases).
+1. **Package**: the `.pkg` from the [releases](https://github.com/moragabriele/awdl-guard/releases),
+   always the newest at `https://github.com/moragabriele/awdl-guard/releases/latest/download/AWDLGuard.pkg`.
 2. **Profile**: [`profiles/AWDLGuard.mobileconfig`](profiles/AWDLGuard.mobileconfig) as a custom
    profile. It holds the settings and pre-approves background items and notifications, so users
    see no prompts and can't disable the background service. For different settings per group,
@@ -134,7 +135,10 @@ Works with any MDM (Mosyle, Jamf, Kandji, Intune, …).
    `profiles/make-manifest.py`.
 3. **Inventory**: [`scripts/mdm-status.sh`](scripts/mdm-status.sh) prints e.g.
    `held-down mode=auto version=0.3.1` for an extension attribute.
-4. **Uninstall**: run the uninstall script above as root, then remove the profile.
+4. **Updates**: schedule [`scripts/update.sh`](scripts/update.sh) as a root script (e.g. weekly).
+   It installs the latest release only if it's newer and signed by Team ID `9WCXJSYTFT` and
+   notarized; Macs without AWDL Guard are skipped.
+5. **Uninstall**: run the uninstall script above as root, then remove the profile.
 
 ## Privacy
 

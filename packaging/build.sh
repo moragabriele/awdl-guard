@@ -93,4 +93,7 @@ if [ -n "${NOTARY_PROFILE:-}" ]; then
     xcrun stapler staple "$PKG"
 fi
 
+# Same package under a fixed name, for .../releases/latest/download/AWDLGuard.pkg links.
+cp "$PKG" "$OUT/AWDLGuard.pkg"
+
 echo "==> Done: $PKG"
