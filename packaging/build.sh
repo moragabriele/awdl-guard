@@ -79,6 +79,8 @@ pkgbuild --root "$PAYLOAD" --component-plist "$WORK/components.plist" \
     --scripts "$ROOT/packaging/scripts" --identifier "$PKG_ID" --version "$VERSION" \
     --install-location / "$WORK/component.pkg"
 
+# Keep this name, the release tag format v<version>, and PKG_ID unchanged: the Installomator
+# label `awdlguard` (and scripts/update.sh) find releases by them, and break if they change.
 PKG="$OUT/AWDLGuard-$VERSION.pkg"
 if [ -n "${PKG_IDENTITY:-}" ]; then
     # Timestamped, so the package stays valid after the certificate expires.
