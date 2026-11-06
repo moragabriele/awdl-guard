@@ -2,7 +2,7 @@
 TESTING_PLUGINS := $(wildcard /Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing)
 TEST_FLAGS := $(if $(TESTING_PLUGINS),-Xswiftc -plugin-path -Xswiftc $(TESTING_PLUGINS),)
 
-.PHONY: build test pkg icon clean
+.PHONY: build test pkg icon social clean
 
 build:
 	swift build
@@ -15,6 +15,9 @@ pkg:
 
 icon:
 	swift packaging/icon/make-icon.swift
+
+social:
+	swift packaging/icon/make-social.swift
 
 clean:
 	rm -rf .build dist
